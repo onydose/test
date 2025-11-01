@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Save FilePicker — Dummy APK</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#071428;color:#e6eef6;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:24px;width:420px;box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+    h1{font-size:18px;margin:0 0 8px}
+    p{color:#9fb7c7;margin:0 0 14px;font-size:13px}
+    button{appearance:none;border:0;padding:12px 16px;border-radius:8px;font-weight:700;background:linear-gradient(90deg,#06b6d4,#3b82f6);color:#042630;cursor:pointer;width:100%}
+    .log{margin-top:12px;padding:10px;background:#021226;border-radius:8px;font-family:monospace;font-size:12px;color:#9fb7c7;min-height:40px}
+    small{display:block;margin-top:8px;color:#7f9fb0}
+  </style>
+</head>
+<body>
+  <div class="card" role="main">
+    <h1>Simpan Dummy APK</h1>
+    <p>Klik tombol untuk memicu Save File Picker (jika didukung) atau fallback download. File akan bernama <code>dummy-app.apk</code>.</p>
+    <button id="saveBtn">Simpan dummy-app.apk</button>
+    <small>Butuh HTTPS / localhost agar Save File Picker berfungsi di mayoritas browser.</small>
+    <div id="log" class="log" aria-live="polite">Ready.</div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('saveBtn');
+    const log = document.getElementById('log');
+
+    function writeLog(txt){
+      log.textContent = txt;
+    }
+
+    // Membuat blob dummy yang menyerupai file APK (bukan APK valid).
+    // Opsional: ganti generateDummyApk() untuk membuat konten biner acak jika ingin "lebih nyata".
+    function generateDummyApk() {
+      // Simple placeholder bytes + readable footer. APK sebenarnya adalah ZIP; di sini kita buat binary-like content.
+      const header = "DUMMY-APK-FILE\\n";
+      const meta = "Generated: " + new Date().toISOString() + "\\n";
+      const body = "This is NOT a real APK. Use only for testing save/download behavior.\\n";
+      const footer = "END-OF-DUMMY-APK\\n";
+      // Encode ke Uint8Array (UTF-8) — sufficient for demo; change to random bytes if needed.
+      const encoder = new TextEncoder();
+      return new Blob([encoder.encode(header + meta + body + footer)], { type: 'application/vnd.android.package-archive' });
+    }
+
+    async function saveDummyApk(){
+      writeLog('Menyiapkan dummy APK...');
+      const blob = generateDummyApk();
+      const suggestedName = 'dummy-app.apk';
+      const acceptTypes = { 'application/vnd.android.package-archive': ['.apk'] };
+
+      try {
+        if (window.showSaveFilePicker) {
+          writeLog('Memanggil showSaveFilePicker — mohon pilih lokasi penyimpanan...');
+          const opts = {
+            suggestedName,
+            types: [
+              { description: 'Android APK', accept: acceptTypes }
+            ]
+          };
+
+          // Panggil picker; kita akan menunggu hasil untuk menulis blob.
+          const handle = await window.showSaveFilePicker(opts);
+
+          // Tulis blob ke file
+          const writable = await handle.createWritable();
+          // Jika API mendukung write(blob) langsung, gunakan itu agar metadata biner terjaga.
+          await writable.write(blob);
+          await writable.close();
+
+          writeLog('Berhasil menyimpan: ' + (handle.name || suggestedName));
+        } else {
+          // Fallback: trigger download via a element
+          writeLog('Browser tidak mendukung showSaveFilePicker — menggunakan fallback download...');
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = suggestedName;
+          // append untuk kompatibilitas Firefox
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          writeLog('Fallback: unduhan dummy-app.apk dipicu.');
+        }
+      } catch (err) {
+        console.error(err);
+        // Jangan menampilkan stack trace lengkap ke UI, hanya pesan singkat
+        writeLog('Gagal / dibatalkan: ' + (err && err.message ? err.message : String(err)));
+      }
+    }
+
+    btn.addEventListener('click', saveDummyApk);
+  </script>
+</body>
+</html>
