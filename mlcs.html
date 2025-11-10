@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Malicious</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 1rem;
+    }
+    button {
+      padding: 0.8rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 0.5rem;
+      border: none;
+      cursor: pointer;
+      background: #0078ff;
+      color: #fff;
+    }
+    button:hover {
+      background: #005fcc;
+    }
+  </style>
+</head>
+<body>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="testTx" disabled>Test Transaction</button>
+
+  <script>
+    const connectBtn = document.getElementById('connectBtn');
+    const testTxBtn = document.getElementById('testTx');
+    let currentAccount = null;
+
+    // Connect wallet handler
+    connectBtn.addEventListener('click', async () => {
+      if (typeof window.ethereum === "undefined") {
+        alert("No wallet detected. Please install MetaMask or another Web3 wallet.");
+        return;
+      }
+
+      try {
+        const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        currentAccount = accounts[0];
+        alert("Connected: " + currentAccount);
+        testTxBtn.disabled = false;
+      } catch (err) {
+        console.error("Wallet connection rejected:", err);
+      }
+    });
+
+    // Test transaction handler
+    testTxBtn.addEventListener('click', async () => {
+      if (!currentAccount) {
+        alert("Please connect your wallet first.");
+        return;
+      }
+
+      try {
+        const txParams = {
+          from: currentAccount,
+          to: "0x5FbDB2315678afecb367f032d93F642f64180aa3", // flagged address
+          value: "0x0", // sending 0 ETH (safe for testing)
+          data: "0x",
+        };
+
+        await ethereum.request({
+          method: "eth_sendTransaction",
+          params: [txParams],
+        });
+      } catch (err) {
+        console.error("Transaction cancelled or failed:", err);
+      }
+    });
+  </script>
+</body>
+</html>
