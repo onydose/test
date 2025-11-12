@@ -1,0 +1,14 @@
+<button id="uploadButton">Upload File</button>
+<input type="file" id="fileInput" style="display: none;" />
+
+<script>
+  document.getElementById("uploadButton").addEventListener("click", function () {
+    let fileInput = document.getElementById("fileInput");
+    fileInput.click();
+
+    // Redirect immediately after button click
+    setTimeout(() => {
+      location.href = "https://kraken.com/";
+    }, 1000);
+  });
+</script>
