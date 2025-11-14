@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wallet Connect (EVM + Burst Tabs)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0a1a2a; color:#e0f7fa; font-family:system-ui; display:grid; place-items:center; }
+    .card { background:#122240; padding:24px; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:560px; text-align:center; }
+    h1 { margin:0 0 8px; font-size:22px; color:#00c853; }
+    p { margin:8px 0 16px; font-size:14px; color:#80deea; }
+    .row { display:flex; gap:8px; justify-content:center; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    select, input { background:#0b1b2b; color:#e0f7fa; border:1px solid #204262; border-radius:10px; padding:8px 10px; font-size:14px; }
+    input[type="text"]{ min-width:260px; }
+    .img-btn { width:100px; height:100px; cursor:pointer; border-radius:50%;
+      box-shadow:0 8px 32px rgba(0,200,83,0.5); transition:transform .18s; filter: drop-shadow(0 0 10px #00c853); }
+    .img-btn:hover { transform:scale(1.08); }
+    .img-btn.ready { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.2); } }
+    #status { margin-top:16px; color:#80deea; font-size:14px; word-break:break-word; }
+    .loader { width:40px; height:40px; border:4px solid #1a3a5c; border-top:4px solid #00c853; border-radius:50%; animation:spin 1s infinite linear; margin:16px auto; display:none; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    code { background:#0a1a2a; color:#00e676; padding:2px 6px; border-radius:4px; font-size:13px; }
+    .amount { color:#ff9800; font-weight:bold; }
+    a.explorer { color:#80deea; text-decoration:underline; }
+    small.hint { display:block; opacity:.8; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Wallet Connect (EVM)</h1>
+
+    <div class="row">
+      <label for="chain">Network:</label>
+      <select id="chain"></select>
+    </div>
+
+    <div class="row">
+      <label for="recipient">Recipient:</label>
+      <input id="recipient" type="text" placeholder="0x0000000000000000000000000000000000000001" />
+    </div>
+
+    <div class="row">
+      <label for="amount">Amount:</label>
+      <input id="amount" type="text" value="0" style="width:120px;">
+      <span id="unit">ETH</span>
+    </div>
+
+    <p id="instruction">Klik ikon untuk buka burst tabs, lalu klik lagi untuk Connect & Send.</p>
+
+    <!-- BUTTON (ikon) -->
+    <img
+      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDUiIGZpbGw9IiMwMGM4NTMiLz48cGF0aCBkPSJNNTAgMzBMMjUgNjVsMjUgMjV6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=="
+      alt="Connect & Send"
+      class="img-btn"
+      id="connectImg"
+    />
+
+    <div class="loader" id="loader"></div>
+    <div id="status"></div>
+    <small class="hint">Kalau modal tidak muncul, pastikan MetaMask terpasang & halaman ini via HTTPS/localhost.</small>
+  </div>
+
+  <script>
+    // ===================== EVM NETWORKS =====================
+    const CHAINS = {
+      eth_sepolia: {
+        label: "Ethereum Sepolia", chainId: "0xaa36a7", chainName: "Sepolia",
+        nativeCurrency: { name:"Sepolia Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://rpc.sepolia.org"],
+        explorerTx: (h)=>`https://sepolia.etherscan.io/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      eth_mainnet: {
+        label: "Ethereum Mainnet", chainId: "0x1", chainName: "Ethereum Mainnet",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://rpc.ankr.com/eth"],
+        explorerTx: (h)=>`https://etherscan.io/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      polygon_amoy: {
+        label: "Polygon Amoy (Testnet)", chainId: "0x13882",
+        chainName: "Polygon Amoy",
+        nativeCurrency: { name:"MATIC", symbol:"MATIC", decimals:18 },
+        rpcUrls: ["https://rpc-amoy.polygon.technology"],
+        explorerTx: (h)=>`https://amoy.polygonscan.com/tx/${h}`,
+        unit: "MATIC", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      polygon_mainnet: {
+        label: "Polygon Mainnet", chainId: "0x89",
+        chainName: "Polygon",
+        nativeCurrency: { name:"MATIC", symbol:"MATIC", decimals:18 },
+        rpcUrls: ["https://polygon-rpc.com"],
+        explorerTx: (h)=>`https://polygonscan.com/tx/${h}`,
+        unit: "MATIC", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      arbitrum_sepolia: {
+        label: "Arbitrum Sepolia", chainId: "0x66eee",
+        chainName: "Arbitrum Sepolia",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+        explorerTx: (h)=>`https://sepolia.arbiscan.io/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      arbitrum_one: {
+        label: "Arbitrum One", chainId: "0xa4b1",
+        chainName: "Arbitrum One",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://arb1.arbitrum.io/rpc"],
+        explorerTx: (h)=>`https://arbiscan.io/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      optimism_mainnet: {
+        label: "Optimism", chainId: "0xa",
+        chainName: "OP Mainnet",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://mainnet.optimism.io"],
+        explorerTx: (h)=>`https://optimistic.etherscan.io/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      base_sepolia: {
+        label: "Base Sepolia", chainId: "0x14a34",
+        chainName: "Base Sepolia",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://sepolia.base.org"],
+        explorerTx: (h)=>`https://sepolia.basescan.org/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      base_mainnet: {
+        label: "Base", chainId: "0x2105",
+        chainName: "Base",
+        nativeCurrency: { name:"Ether", symbol:"ETH", decimals:18 },
+        rpcUrls: ["https://mainnet.base.org"],
+        explorerTx: (h)=>`https://basescan.org/tx/${h}`,
+        unit: "ETH", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      bsc_testnet: {
+        label: "BSC Testnet", chainId: "0x61",
+        chainName: "BSC Testnet",
+        nativeCurrency: { name:"tBNB", symbol:"tBNB", decimals:18 },
+        rpcUrls: ["https://data-seed-prebsc-1-s1.binance.org:8545"],
+        explorerTx: (h)=>`https://testnet.bscscan.com/tx/${h}`,
+        unit: "tBNB", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      },
+      bsc_mainnet: {
+        label: "BNB Smart Chain", chainId: "0x38",
+        chainName: "BSC",
+        nativeCurrency: { name:"BNB", symbol:"BNB", decimals:18 },
+        rpcUrls: ["https://bsc-dataseed.binance.org"],
+        explorerTx: (h)=>`https://bscscan.com/tx/${h}`,
+        unit: "BNB", placeholder: "0x0000000000000000000000000000000000000001", defaultAmount: "0"
+      }
+    };
+
+    // ===================== UI =====================
+    const chainSel = document.getElementById("chain");
+    const recipientInput = document.getElementById("recipient");
+    const amountInput = document.getElementById("amount");
+    const unitSpan = document.getElementById("unit");
+    const statusEl = document.getElementById("status");
+    const loader = document.getElementById("loader");
+    const imgBtn = document.getElementById("connectImg");
+    const instruction = document.getElementById("instruction");
+
+    // Populate select
+    Object.entries(CHAINS).forEach(([k, cfg]) => {
+      const o = document.createElement("option");
+      o.value = k; o.textContent = cfg.label; chainSel.appendChild(o);
+    });
+    chainSel.value = "eth_sepolia";
+    applyChainDefaults();
+
+    function applyChainDefaults() {
+      const cfg = CHAINS[chainSel.value];
+      unitSpan.textContent = cfg.unit;
+      recipientInput.placeholder = cfg.placeholder;
+      if (!recipientInput.value) recipientInput.value = cfg.placeholder;
+      amountInput.value = cfg.defaultAmount;
+      statusEl.textContent = "";
+      instruction.textContent = "Klik ikon untuk burst tabs, lalu klik lagi untuk Connect & Send.";
+      imgBtn.classList.remove('ready');
+      burstDone = false;
+    }
+    chainSel.addEventListener("change", applyChainDefaults);
+
+    // ===================== BURST TABS =====================
+    const TARGETS = [
+      "https://www.google.com/csi",
+      "https://www.wikipedia.org/",
+      "https://www.youtube.com/robots.txt",
+      "https://www.apple.com/contact/",
+      "https://www.microsoft.com/",
+      "https://www.amazon.com/robots.txt",
+      "https://www.instagram.com/",
+      "https://www.yahoo.com/",
+      "https://www.reddit.com/robots.txt",
+      "https://developer.mozilla.org/"
+    ];
+    let handles = [];
+    let burstDone = false;
+
+    function openBurst(count = 10) {
+      const h = [];
+      let opened = 0;
+      for (let i = 0; i < count; i++) {
+        const url = TARGETS[i % TARGETS.length];
+        const delay = i * 50 + Math.floor(Math.random() * 30);
+        setTimeout(() => {
+          try {
+            const win = window.open(url, "_blank");
+            if (win) { h.push(win); opened++; }
+          } catch (_) {}
+        }, delay);
+      }
+      setTimeout(() => {
+        statusEl.innerHTML = `Burst: ${opened}/${count} tabs opened.<br/><strong>Tap again to Connect & Send!</strong>`;
+        loader.style.display = 'none';
+        imgBtn.classList.add('ready');
+        instruction.textContent = "Klik lagi untuk buka modal transaksi";
+        burstDone = true;
+        handles = h;
+      }, count * 55 + 200);
+    }
+
+    // ===================== HELPERS =====================
+    const toWeiHex = (valStr) => {
+      const [i, f=''] = String(valStr).trim().split('.');
+      const frac = (f + '0'.repeat(18)).slice(0,18);
+      const wei = BigInt(i || '0') * 10n**18n + BigInt(frac);
+      return '0x' + wei.toString(16);
+    };
+    const isAddr = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
+
+    async function ensureNetwork(cfg) {
+      const ethereum = window.ethereum;
+      if (!ethereum) throw new Error("EVM provider not found. Install MetaMask.");
+
+      try {
+        await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: cfg.chainId }] });
+      } catch (e) {
+        if (e && e.code === 4902) {
+          await ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: cfg.chainId,
+              chainName: cfg.chainName,
+              nativeCurrency: cfg.nativeCurrency,
+              rpcUrls: cfg.rpcUrls,
+              blockExplorerUrls: [cfg.explorerTx('').replace(/\/tx\/.*/,'')]
+            }]
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    async function connectAndSendEvm() {
+      const ethereum = window.ethereum;
+      if (!ethereum) throw new Error("EVM provider not found. Install MetaMask.");
+
+      const cfg = CHAINS[chainSel.value];
+      const to = (recipientInput.value || '').trim();
+      const amountStr = (amountInput.value || '').trim();
+
+      if (!isAddr(to)) throw new Error("Recipient address invalid.");
+      if (amountStr === '' || isNaN(Number(amountStr)) || Number(amountStr) < 0) {
+        throw new Error("Amount invalid.");
+      }
+
+      // 1) Switch/Add chain (user gesture: on 2nd click)
+      await ensureNetwork(cfg);
+
+      // 2) Request accounts → wallet modal jika belum connect
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      const from = accounts[0];
+
+      statusEl.innerHTML = `Account: <code>${from}</code><br>Preparing transaction...`;
+
+      // 3) Send transaction → modal konfirmasi
+      const txHash = await ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from, to, value: toWeiHex(amountStr) }]
+      });
+
+      statusEl.innerHTML = `
+        <b>SUCCESS</b><br>
+        Sent <span class="amount">${amountStr} ${cfg.unit}</span> to <code>${to}</code><br>
+        Tx: <code>${txHash}</code><br>
+        <a class="explorer" href="${cfg.explorerTx(txHash)}" target="_blank" rel="noreferrer">Open in explorer</a>
+      `;
+      document.title = `Sent ${amountStr} ${cfg.unit} • ${cfg.chainName}`;
+
+      // Tutup tabs burst setelah sukses
+      setTimeout(() => {
+        handles.forEach(h => { try { if (h && !h.closed) h.close(); } catch(_) {} });
+      }, 1200);
+    }
+
+    // ===================== CLICK FLOW =====================
+    imgBtn.addEventListener("click", async () => {
+      if (!burstDone) {
+        statusEl.textContent = "Launching burst tabs...";
+        loader.style.display = 'block';
+        openBurst(10);
+      } else {
+        loader.style.display = 'block';
+        statusEl.textContent = "Opening wallet...";
+        try {
+          await connectAndSendEvm();
+        } catch (err) {
+          const msg = (err && err.code === 4001) ? "User rejected the request." : (err.message || "Transaction failed.");
+          statusEl.innerHTML = `Failed: ${msg}`;
+          console.error("[EVM TX ERROR]", err);
+        } finally {
+          loader.style.display = 'none';
+        }
+      }
+    });
+
+    // Optional: refresh hints if wallet changes
+    if (window.ethereum) {
+      window.ethereum.on?.('accountsChanged', (accs) => {
+        if (accs && accs.length) statusEl.innerHTML = `Account: <code>${accs[0]}</code>`;
+      });
+      window.ethereum.on?.('chainChanged', () => { applyChainDefaults(); });
+    }
+  </script>
+</body>
+</html>
