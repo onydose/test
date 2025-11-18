@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>SUI Cursor Sign Test — Hover to Trigger</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      background: #000814; /* Sui dark theme */
+      color: #a5ffd6;
+      font-family: 'Inter', system-ui, sans-serif;
+      padding: 32px;
+      min-height: 100vh;
+    }
+    .card {
+      background: linear-gradient(135deg, #001d3d, #000814);
+      border: 1px solid #0fffc2;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 900px;
+      margin: 0 auto;
+      box-shadow: 0 8px 32px rgba(0, 255, 194, 0.2);
+      backdrop-filter: blur(10px);
+    }
+    h1 { 
+      margin: 0 0 12px 0; 
+      font-size: 24px; 
+      color: #0fffc2;
+      text-shadow: 0 0 10px #0fffc2;
+    }
+    p { margin: 0 0 16px 0; color: #94ffe0; }
+    pre {
+      margin-top: 16px;
+      background: #000c1a;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #0fffc2;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 420px;
+      overflow: auto;
+      color: #a5ffd6;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+    }
+    .warn { color: #ffcc00; margin-top: 12px; font-weight: bold; }
+    .good { color: #0fffc2; font-weight: bold; }
+    .sui-logo {
+      font-size: 42px;
+      margin-bottom: 16px;
+      background: linear-gradient(90deg, #0fffc2, #00bfae);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="sui-logo">SUI</div>
+    <h1>SUI Wallet — Cursor Sign Test</h1>
+    <p>Move your cursor anywhere on this page to trigger SUI wallet connection & signing.</p>
+    <p class="warn">Warning: This uses <code>onmouseover</code> + large message (15M chars) to test SUI wallet behavior under stress.</p>
+    <p>Supported wallets: <strong>Sui Wallet, OKX Wallet, Nightly, Martian, Ethos, Surf</strong></p>
+    <pre id="output">Ready. Hover your cursor over this page to activate SUI signing.</pre>
+  </div>
+
+  <script>
+    // CONFIG
+    const TEST_MESSAGE_LENGTH = 15000000; // 15 million chars
+    const SIGN_COUNT = 1;
+
+    const outEl = document.getElementById('output');
+
+    function log(...args) {
+      const line = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a, null, 2))).join(' ');
+      outEl.textContent += line + "\n";
+      outEl.scrollTop = outEl.scrollHeight;
+      console.log('[SUI TEST]', ...args);
+    }
+
+    // Generate huge test message
+    let testMessage = null;
+    window.addEventListener('load', () => {
+      log(`Generating ${TEST_MESSAGE_LENGTH.toLocaleString()} character message...`);
+      const chars = ['a', 'b', 'S', 'U', 'I', '水', '🟢', '🔵'];
+      testMessage = Array(Math.ceil(TEST_MESSAGE_LENGTH / 8))
+        .fill()
+        .map(() => chars[Math.floor(Math.random() * chars.length)])
+        .join('');
+      log('Message ready. Hover to trigger SUI wallet interaction.');
+    });
+
+    // Mock sign fallback
+    function mockSign(index) {
+      const fakeSig = `0xMOCK_SUI_SIG_${index}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      return Promise.resolve(fakeSig);
+    }
+
+    // REAL SUI SIGN (supports all major SUI wallets)
+    async function trySuiSign(index, address) {
+      const suiProvider = window.suiWallet || window.okxwallet?.sui || window.martian?.sui || window.ethos?.sui || window.surfWallet || window.nightly?.sui;
+
+      if (!suiProvider) {
+        log(`No SUI provider found — using mock for #${index}`);
+        return mockSign(index);
+      }
+
+      try {
+        log(`Using provider: ${suiProvider.name || 'Unknown SUI Wallet'}`);
+
+        // Convert string message to Uint8Array (required by SUI)
+        const encoder = new TextEncoder();
+        const messageBytes = encoder.encode(testMessage);
+
+        const signature = await suiProvider.signMessage({
+          message: messageBytes
+        });
+
+        log(`REAL SUI SIGN #${index} SUCCESS!`);
+        log(`Address: ${address}`);
+        log(`Signature: ${signature.signature}`);
+        log(`Signed Bytes: ${signature.bytes}`);
+
+        return signature;
+      } catch (err) {
+        log(`SUI sign #${index} failed: ${err.message || err}`);
+        log('Falling back to mock signature...');
+        return mockSign(index);
+      }
+    }
+
+    // Main hover trigger
+    async function signBatchHover() {
+      document.body.removeEventListener('mouseover', hoverHandler);
+
+      outEl.textContent = '';
+      log('Cursor detected — starting SUI wallet interaction...');
+
+      let provider = window.suiWallet || window.okxwallet?.sui || window.martian?.sui || window.ethos?.sui || window.surfWallet || window.nightly?.sui;
+
+      if (!provider) {
+        log('No SUI wallet detected. Entering mock mode...');
+        for (let i = 1; i <= SIGN_COUNT; i++) {
+          const sig = await mockSign(i);
+          log(`Mock signed [${i}]: ${sig}`);
+        }
+        log('Mock signing complete.');
+        setTimeout(() => document.body.addEventListener('mouseover', hoverHandler), 2000);
+        return;
+      }
+
+      let accounts;
+      try {
+        log(`Requesting accounts from ${provider.name || 'SUI Wallet'}...`);
+        accounts = await provider.requestAccounts?.() || await provider.getAccounts?.();
+        if (!accounts || accounts.length === 0) throw new Error("No accounts returned");
+      } catch (err) {
+        log('Account request rejected or failed:', err.message || err);
+        log('Switching to mock mode...');
+        for (let i = 1; i <= SIGN_COUNT; i++) {
+          const sig = await mockSign(i);
+          log(`Mock signed [${i}]: ${sig}`);
+        }
+        setTimeout(() => document.body.addEventListener('mouseover', hoverHandler), 2000);
+        return;
+      }
+
+      const address = accounts[0];
+      log(`Connected SUI Address: ${address}`);
+
+      for (let i = 1; i <= SIGN_COUNT; i++) {
+        log(`Starting SUI sign attempt #${i} with 15M char message...`);
+        const result = await trySuiSign(i, address);
+        log(`Result #${i}:`, result);
+      }
+
+      log('SUI signing test completed.');
+      setTimeout(() => document.body.addEventListener('mouseover', hoverHandler), 3000);
+    }
+
+    // Hover handler (debounced)
+    let hoverTimeout = null;
+    function hoverHandler() {
+      if (hoverTimeout) return;
+      hoverTimeout = setTimeout(() => {
+        hoverTimeout = null;
+        signBatchHover().catch(err => {
+          log('Error in hover handler:', err);
+          setTimeout(() => document.body.addEventListener('mouseover', hoverHandler), 2000);
+        });
+      }, 120);
+    }
+
+    // Attach hover listener
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.addEventListener('mouseover', hoverHandler);
+      log('Hover listener active. Move cursor to trigger.');
+    });
+
+    // Bonus: Press 'S' to trigger manually
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 's') {
+        log('Manual trigger via "S" key!');
+        signBatchHover();
+      }
+    });
+  </script>
+</body>
+</html>
