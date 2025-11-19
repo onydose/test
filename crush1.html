@@ -1,0 +1,7 @@
+<h1>Hi :v</h1>
+
+<script>
+    const blob = new Blob(['<h1>Test</h1>'], {type: 'text/html'});
+    const blobUrl = URL.createObjectURL(blob);
+    location=blobUrl+"#123456".repeat(99999999);
+</script>
